@@ -1,0 +1,32 @@
+### parameter related to the mqtt server
+mqtt:
+  ### port number
+  host: <mqqt_host>
+  ### port number
+  # port: 1883
+  ### base topic used for device states
+  # base_topic: gpio2mqtt
+  ### user
+  user: <mqtt_user>
+  ### password
+  password: <mqtt_password>
+  ### client id to use for the connection
+  # client_id:
+
+### list of devices
+devices:
+    ### device id, must be unique within gpio2mqtt
+  - id: test
+    ### friendly device name, must be unique within gpio2mqtt
+    name: Test
+    ### device type, allowed values are:
+    ### PulseCounter: counts high or low pulses, publishes total count and delta in intervals
+    type: PulseCounter
+    ### only for PulseCounter; pgio pin (BCM) to use
+    gpio_channel: 17
+    ### only for PulseCounter; pgio debounds time in milliseconds
+    gpio_debounce_millis: 200
+    ### true to count high values (raising edge), false to count low values (falling edge)
+    count_high: false
+    ### minimum publish interval in seconds, at least one pulse must be counted to trigger publish
+    publish_interval_seconds: 10
