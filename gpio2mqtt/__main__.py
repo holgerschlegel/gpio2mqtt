@@ -8,7 +8,7 @@ import threading
 import time
 import yaml
 
-import gpio2mqtt
+from . import GPIO2MQTT_VERSION
 from .config import ConfigParser
 from .device_pulse_counter import PulseCounter
 from .devices import Device, Devices
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 def _parse_args() -> argparse.Namespace:
     argparser = argparse.ArgumentParser(prog = "gpio2mqtt")
     argparser.add_argument("--debug", action = "store_true", help = "log debug information")
-    argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {gpio2mqtt.GPIO2MQTT_VERSION}")
+    argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {GPIO2MQTT_VERSION}")
 
     args = argparser.parse_args()
     logging.basicConfig(level = logging.DEBUG if args.debug else logging.INFO)
@@ -83,7 +83,7 @@ def _loop(exit_event: threading.Event, devices: Devices) -> None:
 
 
 def main() -> int: 
-    _LOGGER.info("Starting GPIO2MQTT version %s ...", gpio2mqtt.GPIO2MQTT_VERSION)
+    _LOGGER.info("Starting GPIO2MQTT version %s ...", GPIO2MQTT_VERSION)
 
     config: ConfigParser = _load_config_yaml(os.path.abspath("config.yaml"))
     if not config:

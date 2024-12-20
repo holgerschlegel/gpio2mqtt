@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-from datetime import datetime
 from logging import Logger
 import re
 from typing import Self
@@ -149,23 +147,6 @@ class ConfigParser:
                     self._critical("Invalid value: %s%s: %d is less than %d", self._base_key, key, value, min)
                 if max is not None and value > max:
                     self._critical("Invalid value: %s%s: %d is greater than %d", self._base_key, key, value, max)
-        return value
-
-
-    def get_isodatetime(self, key: str, mandatory: bool = False, default: datetime = None) -> datetime:
-        # TODO doc
-        string: str = self._raw.get(key)
-        value: datetime = None
-        if string is None:
-            if default is not None:
-                value = default
-            elif mandatory:
-                self.error("Mandatory value missing: %s%s", self._base_key, key)
-        else:
-            try:
-                value = datetime.fromisoformat(string)
-            except ValueError:
-                self.error("Invalid value: %s%s: '%s' is not a datetime", self._base_key, key, string)
         return value
 
 

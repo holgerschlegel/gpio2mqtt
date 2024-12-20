@@ -1,8 +1,8 @@
-from datetime import datetime
 import json
 import logging
 import paho.mqtt.client as mqtt_client
 from threading import Lock
+import time
 
 try:
     import RPi.GPIO as GPIO # type: ignore
@@ -12,6 +12,8 @@ except:
 from .config import ConfigParser
 from .devices import Device
 from .mqtt import MqttConnection
+from . import utils
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ class PulseCounter(Device):
 
         self._count: int = None
         self._last_count: int = None
-        self._last_datetime: datetime = None
+        self._last_time: float = None
         self._fetch_last_state: bool = False
 
         self._lock: Lock = Lock()
@@ -48,7 +50,7 @@ class PulseCounter(Device):
         _LOGGER.info("Starting %s with id %s", self.__class__.__name__, self.id)
         self._count = 0
         self._last_count = 0
-        self._last_datetime = datetime.now()
+        self._last_time = time.time()
 
         self._gpio_setup()
         self._start_fetch_last_state()
@@ -66,8 +68,8 @@ class PulseCounter(Device):
         # defined in class Device
         with self._lock:
             diff_count: int = self._count - self._last_count
-            now: datetime = datetime.now()
-            diff_seconds: int = int((now - self._last_datetime).total_seconds())
+            now: float = time.time()
+            diff_seconds: float = now - self._last_time # TODO Besser nur in ganzen Sekunden? Oder zumindest auf 6 Nachkommastellen runden!
 
             if self._fetch_last_state and diff_seconds > 30:
                 # waited long enough, looks like there is no published last state ...
@@ -79,17 +81,17 @@ class PulseCounter(Device):
                 payload: dict = self._get_publish_state_payload(now, diff_count, diff_seconds)
                 if self._mqtt.publish(self.state_topic, payload, retain = True):
                     self._last_count = self._count
-                    self._last_datetime = now
+                    self._last_time = now
 
 
-    def _check_publish_state(self, diff_count: int, diff_seconds: int) -> bool:
+    def _check_publish_state(self, diff_count: int, diff_seconds: float) -> bool:
         return diff_count > 0 and diff_seconds >= self._publish_interval_seconds
 
 
-    def _get_publish_state_payload(self, now: datetime, diff_count: int, diff_seconds: int) -> dict:
+    def _get_publish_state_payload(self, now: float, diff_count: int, diff_seconds: float) -> dict:
         payload: dict = { 
             "count" : self._count,
-            "datetime" : now.isoformat(timespec = "seconds"),
+            "timestamp" : utils.format_iso_timestamp_tz(now),
             "diff_count" : diff_count,
             "diff_seconds" : diff_seconds
         }
@@ -114,11 +116,14 @@ class PulseCounter(Device):
                 try:
                     payload: dict = json.loads(message.payload)
                     read_count: int = int(payload.get("count"))
-                    read_datetime: datetime = datetime.fromisoformat(payload.get("datetime"))
+                    read_time: float = utils.parse_iso_timestamp_tz(payload.get("timestamp"))
                     # all values has been read without error, use it
-                    self._last_count = read_count
-                    self._last_datetime = read_datetime
-                    self._count += read_count
+                    if read_count and read_time:
+                        self._last_count = read_count
+                        self._last_time = read_time
+                        self._count += read_count
+                    else:
+                        _LOGGER.error("Parsing last state message for %s with id %s failed: missing required values", self.__class__.__name__, self.id)
                 except (ValueError, json.JSONDecodeError) as error:
                     _LOGGER.error("Parsing last state message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
                 self._stop_fetch_last_state()
