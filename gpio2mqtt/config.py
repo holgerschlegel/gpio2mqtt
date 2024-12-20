@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from logging import Logger
+import re
 from typing import Self
 
 
@@ -94,15 +95,21 @@ class ConfigParser:
         return result
 
 
-    def get_str(self, key: str, mandatory: bool = False, default: str = None, allowed: set[str] = None) -> str:
+    def get_str(
+            self, key: str, mandatory: bool = False, default: str = None,
+            allowed: set[str] = None,
+            regex_pattern: str | re.Pattern[str] = None, regex_flags = 0
+    ) -> str:
         # TODO doc
         value: str = self._raw.get(key, default)
         if not value:
             if mandatory:
                 self.error("Mandatory value missing: %s%s", self._base_key, key)
-        elif allowed is not None and value not in allowed:
-            self.error("Invalid value: %s%s: %s is not in %s", self._base_key, key, value, allowed)
-            value = None
+        else:
+            if allowed is not None and value not in allowed:
+                self.error("Invalid value: %s%s: '%s' is not in %s", self._base_key, key, value, allowed)
+            if regex_pattern is not None and re.fullmatch(regex_pattern, value, regex_flags) == None:
+                self.error("Invalid value: %s%s: '%s' does not match regex pattern '%s'", self._base_key, key, value, regex_pattern)
         return value
 
 
@@ -119,7 +126,7 @@ class ConfigParser:
             try:
                 value = bool(string)
             except ValueError:
-                self.error("Invalid value: %s%s: %s is not a bool", self._base_key, key, string)
+                self.error("Invalid value: %s%s: '%s' is not a bool", self._base_key, key, string)
         return value
 
 
@@ -136,7 +143,7 @@ class ConfigParser:
             try:
                 value = int(string)
             except ValueError:
-                self.error("Invalid value: %s%s: %s is not an int", self._base_key, key, string)
+                self.error("Invalid value: %s%s: '%s' is not an int", self._base_key, key, string)
             if value is not None:
                 if min is not None and value < min:
                     self._critical("Invalid value: %s%s: %d is less than %d", self._base_key, key, value, min)
@@ -158,7 +165,7 @@ class ConfigParser:
             try:
                 value = datetime.fromisoformat(string)
             except ValueError:
-                self.error("Invalid value: %s%s: %s is not a datetime", self._base_key, key, string)
+                self.error("Invalid value: %s%s: '%s' is not a datetime", self._base_key, key, string)
         return value
 
 

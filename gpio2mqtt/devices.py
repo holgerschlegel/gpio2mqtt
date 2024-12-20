@@ -27,7 +27,7 @@ class Device():
             device_config (ConfigParser): the device configuration
             mqtt (MqttConnection): the mqtt connection
         """
-        self._id: str = device_config.get_str("id", mandatory = True)
+        self._id: str = device_config.get_str("id", mandatory = True, regex_pattern = "[a-zA-Z0-9_-]+")
         self._name: str = device_config.get_str("name", mandatory = True)
         self._mqtt = mqtt
 
