@@ -1,13 +1,9 @@
 import json
+from gpiozero import LineSensor
 import logging
 import paho.mqtt.client as mqtt_client
 from threading import Lock
 import time
-
-try:
-    import RPi.GPIO as GPIO # type: ignore
-except:
-    import Mock.GPIO as GPIO
 
 from .config import ConfigParser
 from .devices import Device
@@ -32,9 +28,8 @@ class PulseCounter(Device):
             mqtt (MqttConnection): the mqtt connection
         """
         super().__init__(device_config, mqtt)
-        self._gpio_channel: int = device_config.get_int("gpio_channel", mandatory = True, min = 1, max = 40)
-        self._gpio_debounce_millis: int = device_config.get_int("gpio_debounce_millis", mandatory = True, default = 0, min = 0)
-        self._count_high: bool = device_config.get_bool("count_high", mandatory = True, default = True)
+        self._gpio_pin: int = device_config.get_int("gpio_pin", mandatory = True, min = 1, max = 40)
+        self._active_high: bool = device_config.get_bool("active_high", mandatory = True)
         self._publish_interval_seconds: int = device_config.get_int("publish_interval_seconds", mandatory = True, default = 0, min = 0)
 
         self._count: int = None
@@ -52,15 +47,18 @@ class PulseCounter(Device):
         self._last_count = 0
         self._last_time = time.time()
 
-        self._gpio_setup()
+        self._sensor = LineSensor(self._gpio_pin, pull_up = not self._active_high)
+        self._sensor.when_line = self._count_pulse
         self._start_fetch_last_state()
         # TODO publish home assistant config
 
 
     def stop(self) -> None:
         # defined in class Device
-        GPIO.remove_event_detect(self._gpio_channel)
         self._stop_fetch_last_state()
+        if self._sensor:
+            self._sensor.close()
+            self._sensor = None
         _LOGGER.info("Stopped %s with id %s", self.__class__.__name__, self.id)
 
 
@@ -69,7 +67,7 @@ class PulseCounter(Device):
         with self._lock:
             diff_count: int = self._count - self._last_count
             now: float = time.time()
-            diff_seconds: float = now - self._last_time # TODO Besser nur in ganzen Sekunden? Oder zumindest auf 6 Nachkommastellen runden!
+            diff_seconds: float = round(now - self._last_time, 6) # TODO Oder besser nur in ganzen Sekunden?
 
             if self._fetch_last_state and diff_seconds > 30:
                 # waited long enough, looks like there is no published last state ...
@@ -129,23 +127,12 @@ class PulseCounter(Device):
                 self._stop_fetch_last_state()
 
 
-    def _gpio_setup(self) -> None:
-        if self._count_high:
-            pull_up_down = GPIO.PUD_DOWN
-            edge = GPIO.RISING
-        else:
-            pull_up_down = GPIO.PUD_UP
-            edge = GPIO.FALLING
-        GPIO.setup(self._gpio_channel, GPIO.IN, pull_up_down)
-        GPIO.add_event_detect(self._gpio_channel, edge, self._gpio_callback, bouncetime = self._gpio_debounce_millis)
-
-
-    def _gpio_callback(self, channel) -> None:
+    def _count_pulse(self) -> None:
         with self._lock:
-            _LOGGER.debug("GPIO input for %s with id %s on channel %d", self.__class__.__name__, self.id, channel)
+            _LOGGER.debug("Input pulse for %s with id %s detected", self.__class__.__name__, self.id)
             self._count += 1
 
 
-    def mock_gpio_input(self) -> None:
+    def mock_input(self) -> None:
         # defined in class Device
-        self._gpio_callback(self._gpio_channel)
+        self._count_pulse()

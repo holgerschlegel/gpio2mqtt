@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def _parse_args() -> argparse.Namespace:
     argparser = argparse.ArgumentParser(prog = "gpio2mqtt")
+    argparser.add_argument("--validate", action = "store_true", help = "validate config.yaml and exit")
     argparser.add_argument("--debug", action = "store_true", help = "log debug information")
     argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {GPIO2MQTT_VERSION}")
 
@@ -67,7 +68,7 @@ def _setup_signals(exit_event: threading.Event, devices: Devices):
         _LOGGER.info("Installing signal handler to MOCK gpio input. Command to trigger: kill -s sigusr1 %s", os.getpid())
         def usr1_handler(signum, frame):
             _LOGGER.info("Received signal '%s'", signal.strsignal(signum))
-            devices.mock_gpio_input()
+            devices.mock_input()
         signal.signal(signal.SIGUSR1, usr1_handler)
 
 
@@ -82,12 +83,8 @@ def _loop(exit_event: threading.Event, devices: Devices) -> None:
             time.sleep(60)
 
 
-def main() -> int: 
+def main(config: ConfigParser) -> int: 
     _LOGGER.info("Starting GPIO2MQTT version %s ...", GPIO2MQTT_VERSION)
-
-    config: ConfigParser = _load_config_yaml(os.path.abspath("config.yaml"))
-    if not config:
-        return 1
 
     # create and start objects
     exit_event = threading.Event()
@@ -115,5 +112,14 @@ def main() -> int:
 
 # main entry point
 args = _parse_args()
-exit_code: int = main()
+
+config_file: str = os.path.abspath("config.yaml")
+config: ConfigParser = _load_config_yaml(config_file)
+if not config:
+    sys.exit(1)
+if args.validate:
+    _LOGGER.info("Configuration file '%s' is valid", config_file)
+    sys.exit(0)
+
+exit_code: int = main(config)
 sys.exit(exit_code)

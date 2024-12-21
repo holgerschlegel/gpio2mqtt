@@ -1,6 +1,6 @@
 ### parameter related to the mqtt server
 mqtt:
-  ### port number
+  ### host name or ip address
   host: <mqqt_host>
   ### port number
   # port: 1883
@@ -22,11 +22,9 @@ devices:
     ### device type, allowed values are:
     ### PulseCounter: counts high or low pulses, publishes total count and delta in intervals
     type: PulseCounter
-    ### only for PulseCounter; pgio pin (BCM) to use
-    gpio_channel: 17
-    ### only for PulseCounter; pgio debounds time in milliseconds
-    gpio_debounce_millis: 200
-    ### true to count high values (raising edge), false to count low values (falling edge)
-    count_high: false
-    ### minimum publish interval in seconds, at least one pulse must be counted to trigger publish
-    publish_interval_seconds: 10
+    ### (PulseCounter); pgio pin (BCM) to use
+    gpio_pin: 17
+    ### (PulseCounter); true to handle high input as active (raising edge), false to handle low input as active (falling edge)
+    active_high: true
+    ### (PulseCounter); minimum publish interval in seconds, at least one pulse must be counted to trigger publish
+    # publish_interval_seconds: 0

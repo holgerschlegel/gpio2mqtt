@@ -1,12 +1,7 @@
 from abc import abstractmethod
+from gpiozero import Device as GpioDevice
+from gpiozero.pins.mock import MockFactory
 import logging
-
-try:
-    import RPi.GPIO as GPIO # type: ignore
-    _USING_MOCK_GPIO: bool = False
-except:
-    import Mock.GPIO as GPIO
-    _USING_MOCK_GPIO: bool = True
 
 from .config import ConfigParser
 from .mqtt import MqttConnection
@@ -89,9 +84,9 @@ class Device():
         pass
 
 
-    def mock_gpio_input(self) -> None:
+    def mock_input(self) -> None:
         """
-        Use for testing purpose only. Mocks/simulates a GPIO input on the device.
+        Use for testing purpose only. Mocks/simulates an input on the device.
         """
         pass
 
@@ -119,7 +114,6 @@ class Devices:
         """
         Starts the defined devices.
         """
-        GPIO.setmode(GPIO.BCM)
         for device in self._devices:
             device.start()
 
@@ -130,8 +124,6 @@ class Devices:
         """
         for device in self._devices:
             device.stop()
-        GPIO.cleanup()
-        pass
 
 
     def loop(self) -> None:
@@ -146,17 +138,17 @@ class Devices:
     def using_mock_gpio(self) -> bool:
         """
         Returns:
-            bool: True if Mock.GPIO is used, False otherwise
+            bool: True if mock gpio is used, False otherwise
         """
-        return _USING_MOCK_GPIO
+        return isinstance(GpioDevice.pin_factory, MockFactory)
 
 
-    def mock_gpio_input(self) -> None:
+    def mock_input(self) -> None:
         """
         Use for testing purpose only. Mocks/simulates a GPIO input on the first device.
         """
         if self._devices:
-            self._devices[0].mock_gpio_input()
+            self._devices[0].mock_input()
 
 
     def _create_devices(self, config: ConfigParser, mqtt: MqttConnection) -> list[Device]:

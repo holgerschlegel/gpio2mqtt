@@ -12,16 +12,29 @@
             "cwd": "${workspaceFolder}",
             "args": [
                 "--debug"
-            ]
+            ],
+            "env": {
+                "GPIOZERO_PIN_FACTORY": "mock"
+            }
         },
         {
-            "name": "Debug: show version",
+            "name": "Debug: --version",
             "type": "debugpy",
             "request": "launch",
             "module": "gpio2mqtt",
             "cwd": "${workspaceFolder}",
             "args": [
                 "--version"
+            ]
+        },
+        {
+            "name": "Debug: --help",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gpio2mqtt",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--help"
             ]
         }
     ]
