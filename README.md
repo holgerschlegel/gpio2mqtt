@@ -14,7 +14,7 @@ My first project in Python ...
 - [x] basic pulse counter device that only counts pulses and publishes its state to MQTT
 - [x] use gpiozero with rpi-lgpio instead of rpi.gpio
 - [ ] improve logging config
-- [ ] implement pulse based energy meter (Ferraris counter) with kWh and kW output
+- [ ] implement pulse counter based energy meter (Ferraris counter) with enery (kWh) and power (W or kW) output
 - [ ] systemd service file and notification integration
 - [ ] devices publish home assistant auto discovery message to MQTT
 

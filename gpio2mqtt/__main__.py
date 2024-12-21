@@ -38,16 +38,16 @@ def _load_config_yaml(file: str) -> ConfigParser:
     Returns:
         ConfigParser: the loaded configuration values, None if loading the file fails
     """
-    _LOGGER.info("Loading configuration file %s", file)
+    _LOGGER.info("Loading configuration file '%s'", file)
     result = None
     try:
         with open(file, "r", encoding = "utf8") as stream:
             raw = yaml.safe_load(stream)
         result = ConfigParser(raw, _LOGGER)
     except FileNotFoundError:
-        _LOGGER.critical("Configuration file %s not found", file)
+        _LOGGER.critical("Configuration file '%s' not found", file)
     except yaml.YAMLError as error:
-        _LOGGER.critical("Configuration file %s invalid: ", file, error)
+        _LOGGER.critical("Configuration file '%s' invalid: ", file, error)
     return result
 
 
