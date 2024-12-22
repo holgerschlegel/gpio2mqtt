@@ -12,6 +12,7 @@ from . import utils
 
 
 _LOGGER = logging.getLogger(__name__)
+_FETCH_LAST_STATE_MAX_SECONDS: int = 10
 
 
 class PulseCounter(Device):
@@ -42,24 +43,29 @@ class PulseCounter(Device):
 
     def start(self) -> None:
         # defined in class Device
-        _LOGGER.info("Starting %s with id %s", self.__class__.__name__, self.id)
-        self._count = 0
-        self._last_count = 0
-        self._last_time = time.time()
+        with self._lock:
+            _LOGGER.info("Starting %s with id %s", self.__class__.__name__, self.id)
+            self._count = 0
+            self._last_count = 0
+            self._last_time = time.time()
 
-        self._sensor = LineSensor(self._gpio_pin, pull_up = not self._active_high)
-        self._sensor.when_line = self._count_pulse
-        self._start_fetch_last_state()
-        # TODO publish home assistant config
+            self._sensor = LineSensor(self._gpio_pin, pull_up = not self._active_high)
+            self._sensor.when_line = self._on_pulse
+
+            self._start_fetch_last_state()
+            self._start_command_handler()
+            # TODO publish home assistant config
 
 
     def stop(self) -> None:
         # defined in class Device
-        self._stop_fetch_last_state()
-        if self._sensor:
-            self._sensor.close()
-            self._sensor = None
-        _LOGGER.info("Stopped %s with id %s", self.__class__.__name__, self.id)
+        with self._lock:
+            self._stop_fetch_last_state()
+            self._stop_command_handler()
+            if self._sensor:
+                self._sensor.close()
+                self._sensor = None
+            _LOGGER.info("Stopped %s with id %s", self.__class__.__name__, self.id)
 
 
     def loop(self) -> None:
@@ -67,23 +73,28 @@ class PulseCounter(Device):
         with self._lock:
             diff_count: int = self._count - self._last_count
             now: float = time.time()
-            diff_seconds: float = round(now - self._last_time, 6) # TODO Oder besser nur in ganzen Sekunden?
+            diff_seconds: float = round(now - self._last_time, 6)
 
-            if self._fetch_last_state and diff_seconds > 30:
+            if self._fetch_last_state and diff_seconds > _FETCH_LAST_STATE_MAX_SECONDS:
                 # waited long enough, looks like there is no published last state ...
                 _LOGGER.debug("Waiting for last state message timed out for %s with id %s", self.__class__.__name__, self.id)
                 self._stop_fetch_last_state()
 
             if not self._fetch_last_state and self._check_publish_state(diff_count, diff_seconds):
                 _LOGGER.debug("Publishing state for %s with id %s", self.__class__.__name__, self.id)
-                payload: dict = self._get_publish_state_payload(now, diff_count, diff_seconds)
-                if self._mqtt.publish(self.state_topic, payload, retain = True):
+                if self._publish_state(now, diff_count, diff_seconds):
                     self._last_count = self._count
                     self._last_time = now
 
 
     def _check_publish_state(self, diff_count: int, diff_seconds: float) -> bool:
         return diff_count > 0 and diff_seconds >= self._publish_interval_seconds
+
+
+    def _publish_state(self, now: float, diff_count: int, diff_seconds: float) -> bool:
+        _LOGGER.debug("Publishing state for %s with id %s", self.__class__.__name__, self.id)
+        payload: dict = self._get_publish_state_payload(now, diff_count, diff_seconds)
+        return self._mqtt.publish(self.state_topic, payload, retain = True)
 
 
     def _get_publish_state_payload(self, now: float, diff_count: int, diff_seconds: float) -> dict:
@@ -115,11 +126,11 @@ class PulseCounter(Device):
                     payload: dict = json.loads(message.payload)
                     read_count: int = int(payload.get("count"))
                     read_time: float = utils.parse_iso_timestamp_tz(payload.get("timestamp"))
-                    # all values has been read without error, use it
                     if read_count and read_time:
+                        # message is valid, set last values but keep pulses counted since device start
+                        self._count += read_count
                         self._last_count = read_count
                         self._last_time = read_time
-                        self._count += read_count
                     else:
                         _LOGGER.error("Parsing last state message for %s with id %s failed: missing required values", self.__class__.__name__, self.id)
                 except (ValueError, json.JSONDecodeError) as error:
@@ -127,7 +138,36 @@ class PulseCounter(Device):
                 self._stop_fetch_last_state()
 
 
-    def _count_pulse(self) -> None:
+    def _start_command_handler(self) -> None:
+        self._mqtt.add_message_handler(self.state_topic + "/set/count", self._on_set_count_message)
+
+
+    def _stop_command_handler(self) -> None:
+        self._mqtt.remove_message_handler(self.state_topic + "/set/count", self._on_set_count_message)
+
+
+    def _on_set_count_message(self, message: mqtt_client.MQTTMessage) -> None:
+        _LOGGER.info("Received set count message for %s with id %s: %s", self.__class__.__name__, self.id, message.payload)
+        try:
+            read_count: int = int(message.payload.decode())
+            if read_count:
+                self._set_count(read_count)
+        except (ValueError) as error:
+            _LOGGER.error("Parsing set command message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
+
+
+    def _set_count(self, count: int) -> None:
+        with self._lock:
+            now: float = time.time()
+            self._stop_fetch_last_state()
+
+            self._count = count
+            self._last_count = count
+            self._last_time = now
+            self._publish_state(now, 0, 0)
+
+
+    def _on_pulse(self) -> None:
         with self._lock:
             _LOGGER.debug("Input pulse for %s with id %s detected", self.__class__.__name__, self.id)
             self._count += 1
@@ -135,4 +175,4 @@ class PulseCounter(Device):
 
     def mock_input(self) -> None:
         # defined in class Device
-        self._count_pulse()
+        self._on_pulse()
