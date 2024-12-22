@@ -24,7 +24,7 @@ def _setup_logging(logconsole: bool, logdebug: bool) -> None:
         "disable_existing_loggers" : False,
         "formatters" : {
             "standard" : {
-                "format" : "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                "format" : "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
             }
         },
         "handlers" : {
@@ -117,7 +117,7 @@ def _loop(exit_event: threading.Event, devices: Devices) -> None:
 
 
 def main(config: ConfigParser) -> int: 
-    _LOGGER.info("Starting GPIO2MQTT version %s ...", GPIO2MQTT_VERSION)
+    _LOGGER.info("Starting GPIO2MQTT service version %s ...", GPIO2MQTT_VERSION)
 
     # create and start objects
     exit_event = threading.Event()
