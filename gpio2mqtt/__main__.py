@@ -1,6 +1,7 @@
 # Main entry point of the GPIO2MQTT application
 import argparse
 import logging
+import logging.config
 import os
 import signal
 import sys
@@ -17,14 +18,46 @@ from .mqtt import MqttConnection
 _LOGGER = logging.getLogger(__name__)
 
 
+def _setup_logging(logconsole: bool, logdebug: bool) -> None:
+    dict_conf: dict = {
+        "version" : 1,
+        "disable_existing_loggers" : False,
+        "formatters" : {
+            "standard" : {
+                "format" : "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            }
+        },
+        "handlers" : {
+            "console" : {
+                "class" : "logging.StreamHandler",
+                "formatter" : "standard",
+                "stream" : sys.stdout
+            },
+            "file" : {
+                "class" : "logging.handlers.RotatingFileHandler",
+                "formatter" : "standard",
+                "filename" : os.path.abspath("gpio2mqtt.log"),
+                "maxBytes" : 1_000_000,
+                "backupCount" : 5
+            }
+        },
+        "root" : {
+            "level" : logging.DEBUG if logdebug else logging.INFO,
+            "handlers" : [ "console" if logconsole else "file" ]
+        }
+    }
+    logging.config.dictConfig(dict_conf)
+
+
 def _parse_args() -> argparse.Namespace:
     argparser = argparse.ArgumentParser(prog = "gpio2mqtt")
     argparser.add_argument("--validate", action = "store_true", help = "validate config.yaml and exit")
-    argparser.add_argument("--debug", action = "store_true", help = "log debug information")
+    argparser.add_argument("--logconsole", action = "store_true", help = "log to console instead of file")
+    argparser.add_argument("--logdebug", action = "store_true", help = "log debug information")
     argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {GPIO2MQTT_VERSION}")
 
     args = argparser.parse_args()
-    logging.basicConfig(level = logging.DEBUG if args.debug else logging.INFO)
+    _setup_logging(args.logconsole, args.logdebug)
     return args
 
 

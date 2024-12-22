@@ -11,7 +11,8 @@
             "module": "gpio2mqtt",
             "cwd": "${workspaceFolder}",
             "args": [
-                "--debug"
+                "--logconsole",
+                "--logdebug"
             ],
             "env": {
                 "GPIOZERO_PIN_FACTORY": "mock"

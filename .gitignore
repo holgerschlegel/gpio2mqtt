@@ -1,7 +1,8 @@
 # project specific files
-/_sandbox.py
+/_*.*
 /config.yaml
-
+/gpio2mqtt.log
+/gpio2mqtt.log.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
