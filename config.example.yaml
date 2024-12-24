@@ -15,7 +15,7 @@ mqtt:
 
 ### list of devices
 devices:
-    ### device id, must be unique within gpio2mqtt
+    ### device id, also used to build mqtt topics, must be unique within gpio2mqtt
   - id: test
     ### friendly device name, must be unique within gpio2mqtt
     name: Test
@@ -26,5 +26,7 @@ devices:
     gpio_pin: 17
     ### (PulseCounter); true to handle high input as active (raising edge), false to handle low input as active (falling edge)
     active_high: true
+    ### (PulseCounter); how to init the last state; "new" or not set to start with zero, "mqtt" to fetch last state from mqtt state topic
+    #init_mode: new
     ### (PulseCounter); minimum publish interval in seconds, at least one pulse must be counted to trigger publish
     # publish_interval_seconds: 0

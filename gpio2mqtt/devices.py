@@ -25,7 +25,7 @@ class Device():
         self._id: str = device_config.get_str("id", mandatory = True, regex_pattern = "[a-zA-Z0-9_-]+")
         self._name: str = device_config.get_str("name", mandatory = True)
         self._mqtt = mqtt
-        self._state_topic: str = self._mqtt.base_topic + "/" + self.name
+        self._state_topic: str = self._mqtt.base_topic + "/" + self.id
 
     
     def __str__(self):
