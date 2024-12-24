@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from gpiozero import Device as GpioDevice
+from gpiozero import Device as GpiozeroDevice
 from gpiozero.pins.mock import MockFactory
 import logging
 
@@ -25,7 +25,6 @@ class Device():
         self._id: str = device_config.get_str("id", mandatory = True, regex_pattern = "[a-zA-Z0-9_-]+")
         self._name: str = device_config.get_str("name", mandatory = True)
         self._mqtt = mqtt
-
         self._state_topic: str = self._mqtt.base_topic + "/" + self.name
 
     
@@ -79,7 +78,7 @@ class Device():
     @abstractmethod
     def loop(self) -> None:
         """
-        Invoked from the main loop. Devices may use it to publish collected the device values to MQTT. 
+        Invoked from the main loop. Devices may use it to publish the device values to MQTT. 
         """
         pass
 
@@ -140,7 +139,7 @@ class Devices:
         Returns:
             bool: True if mock gpio is used, False otherwise
         """
-        return isinstance(GpioDevice.pin_factory, MockFactory)
+        return isinstance(GpiozeroDevice.pin_factory, MockFactory)
 
 
     def mock_input(self) -> None:

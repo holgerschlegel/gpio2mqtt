@@ -30,9 +30,6 @@ class MqttConnection:
         password: str = mqtt_config.get_str("password", mandatory = True)
         client_id: str = mqtt_config.get_str("client_id")
 
-        #
-        self._message_handlers: dict[str, set[MqttConnectionOnMessage]] = {}
-
         # configure mqtt client but do not connect now
         self._client: mqtt_client.Client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, client_id)
         self._client.username = user
@@ -41,6 +38,7 @@ class MqttConnection:
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
+        self._message_handlers: dict[str, set[MqttConnectionOnMessage]] = {}
         self._bridge_state_topic: str = self._base_topic + "/bridge/state"
         self._client.will_set(self._bridge_state_topic, self._get_bridge_state_payload_str(False), qos = 0, retain = True)
 
@@ -160,6 +158,6 @@ class MqttConnection:
         _LOGGER.debug("Received message on topic %s: %s", message.topic, str(message.payload))
         handlers = self._message_handlers.get(message.topic)
         if handlers:
-            # iterate over copy to allow a handler to remove itself
+            # iterate over copy to allow that handlers remove subscriptions
             for handler in handlers.copy():
                 handler(message)

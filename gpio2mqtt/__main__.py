@@ -18,6 +18,15 @@ from .mqtt import MqttConnection
 _LOGGER = logging.getLogger(__name__)
 
 
+def _parse_args() -> argparse.Namespace:
+    argparser = argparse.ArgumentParser(prog = "gpio2mqtt")
+    argparser.add_argument("--logconsole", action = "store_true", help = "log to console instead of file")
+    argparser.add_argument("--logdebug", action = "store_true", help = "log debug information")
+    argparser.add_argument("--validate", action = "store_true", help = "validate config.yaml and exit")
+    argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {GPIO2MQTT_VERSION}")
+    return argparser.parse_args()
+
+
 def _setup_logging(logconsole: bool, logdebug: bool) -> None:
     dict_conf: dict = {
         "version" : 1,
@@ -49,28 +58,7 @@ def _setup_logging(logconsole: bool, logdebug: bool) -> None:
     logging.config.dictConfig(dict_conf)
 
 
-def _parse_args() -> argparse.Namespace:
-    argparser = argparse.ArgumentParser(prog = "gpio2mqtt")
-    argparser.add_argument("--validate", action = "store_true", help = "validate config.yaml and exit")
-    argparser.add_argument("--logconsole", action = "store_true", help = "log to console instead of file")
-    argparser.add_argument("--logdebug", action = "store_true", help = "log debug information")
-    argparser.add_argument("--version", action = "version", version = f"GPIO2MQTT version {GPIO2MQTT_VERSION}")
-
-    args = argparser.parse_args()
-    _setup_logging(args.logconsole, args.logdebug)
-    return args
-
-
 def _load_config_yaml(file: str) -> ConfigParser:
-    """
-    Loads the given yaml configuration file and returns a configuration parser for its content.
-
-    Args:
-        file (str): the configuration file to load
-        logger (Logger, optional): the logger for error messages
-    Returns:
-        ConfigParser: the loaded configuration values, None if loading the file fails
-    """
     _LOGGER.info("Loading configuration file '%s'", file)
     result = None
     try:
@@ -86,7 +74,7 @@ def _load_config_yaml(file: str) -> ConfigParser:
 
 def _get_device_classes() -> list[type[Device]]:
     # device classes must be passes as argument to Devices instance to break cyclic imports
-    # for now, there is no need to dynamically scan for available devices classes
+    # for now, there is no need to dynamically scan for available device classes
     return [ PulseCounter ]
 
 
@@ -145,11 +133,12 @@ def main(config: ConfigParser) -> int:
 
 # main entry point
 args = _parse_args()
+_setup_logging(args.logconsole, args.logdebug)
 
 config_file: str = os.path.abspath("config.yaml")
 config: ConfigParser = _load_config_yaml(config_file)
 if not config:
-    sys.exit(1)
+    sys.exit(2)
 if args.validate:
     _LOGGER.info("Configuration file '%s' is valid", config_file)
     sys.exit(0)

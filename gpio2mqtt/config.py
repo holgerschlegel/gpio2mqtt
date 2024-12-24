@@ -81,7 +81,15 @@ class ConfigParser:
 
 
     def get_list_parsers(self, key: str, logger: Logger = None) -> list[Self]:
-        # TODO doc
+        """
+        Creates a new parser for each entry in the sub list with the given key.
+
+        Args:
+            key (str): the key for the sub list
+            logger (Logger, optional): the logger for error messages, None to use the logger of this instance
+        Returns:
+            list[Self]: the parsers for the list entries, an empty list if the sub node is not a list or an empty list
+        """
         list_raw = self._raw.get(key, [])
         result: list[Self] = []
         if list_raw:
@@ -98,21 +106,47 @@ class ConfigParser:
             allowed: set[str] = None,
             regex_pattern: str | re.Pattern[str] = None, regex_flags = 0
     ) -> str:
-        # TODO doc
+        """
+        Gets the string value for the given key.
+        Returns None if the value is not valid according to the given validation arguments.
+
+        Args:
+            key (str): the key for the value
+            mandatory (bool, optional): True if the value is mandatory, False otherwise
+            default (str, optional): the default value
+            allowed (set[str], optional): the allowed values, None for all values are allowed
+            regex_pattern (str | re.Pattern[str], optional): the regualar expression pattern the value must match, None for no pattern check
+            regex_flags (int, optional): the regular expression flags, only used if regex_pattern is not None
+        Returns:
+            str: the string value or None
+        """
         value: str = self._raw.get(key, default)
         if not value:
             if mandatory:
                 self.error("Mandatory value missing: %s%s", self._base_key, key)
+                value = None
         else:
             if allowed is not None and value not in allowed:
                 self.error("Invalid value: %s%s: '%s' is not in %s", self._base_key, key, value, allowed)
+                value = None
             if regex_pattern is not None and re.fullmatch(regex_pattern, value, regex_flags) == None:
                 self.error("Invalid value: %s%s: '%s' does not match regex pattern '%s'", self._base_key, key, value, regex_pattern)
+                value = None
         return value
 
 
     def get_bool(self, key: str, mandatory: bool = False, default: bool = None) -> bool:
-        # TODO doc
+        """
+        Gets the bool value for the given key.
+        Returns None if the value can not be interpreted as a bool or is not valid according to the given validation arguments.
+
+        Args:
+            key (str): the key for the value
+            mandatory (bool, optional): True if the value is mandatory, False otherwise
+            default (bool, optional): the default value
+        Returns:
+            bool: the bool value or None
+        """
         string: str = self._raw.get(key)
         value: bool = None
         if string is None:
@@ -120,16 +154,30 @@ class ConfigParser:
                 value = default
             elif mandatory:
                 self.error("Mandatory value missing: %s%s", self._base_key, key)
+                value = None
         else:
             try:
                 value = bool(string)
             except ValueError:
                 self.error("Invalid value: %s%s: '%s' is not a bool", self._base_key, key, string)
+                value = None
         return value
 
 
     def get_int(self, key: str, mandatory: bool = False, default: int = None, min: int = None, max: int = None) -> int:
-        # TODO doc
+        """
+        Gets the int value for the given key.
+        Returns None if the value can not be interpreted as a int or is not valid according to the given validation arguments.
+
+        Args:
+            key (str): the key for the value
+            mandatory (bool, optional): True if the value is mandatory, False otherwise
+            default (int, optional): the default value
+            min (int, optional): the minimum allowed value, None for no minimum
+            max (int, optional): the maximum allowed value, None for no maximum
+        Returns:
+            int: the int value or None
+        """
         string: str = self._raw.get(key)
         value: int = None
         if string is None:
@@ -151,7 +199,18 @@ class ConfigParser:
 
 
     def check_unique(self, key: str, value: any, values: set[any]) -> bool:
-        # TODO doc
+        """
+        Checks if the given value is unique.
+        If the value is in the given set, an error is logged and False is returned.
+        If the value is not in the given set, it is added to the set and True is returned.
+
+        Args:
+            key (str): the key for the value
+            value (any): the value to check
+            values (set[any]): the (set of) already checked values
+        Returns:
+            bool: True if the value is unique, False otherwise
+        """
         result: bool = value not in values
         if result:
             values.add(value)

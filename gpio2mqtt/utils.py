@@ -20,6 +20,7 @@ def format_iso_timestamp_tz(seconds: float) -> str:
         result = time.strftime(ISO_FORMAT_TIMESTAMP_TZ, time.localtime(seconds))
     return result
 
+
 def parse_iso_timestamp_tz(string: str) -> float:
     """
     Parses the given iso timestamp string with time zone as a time in seconds since epoch.
