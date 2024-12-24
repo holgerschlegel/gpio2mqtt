@@ -16,17 +16,20 @@ mqtt:
 ### list of devices
 devices:
     ### device id, also used to build mqtt topics, must be unique within gpio2mqtt
-  - id: test
+  - id: <unique id>
     ### friendly device name, must be unique within gpio2mqtt
-    name: Test
+    name: <unique name>
     ### device type, allowed values are:
     ### PulseCounter: counts high or low pulses, publishes total count and delta in intervals
-    type: PulseCounter
-    ### (PulseCounter); pgio pin (BCM) to use
-    gpio_pin: 17
-    ### (PulseCounter); true to handle high input as active (raising edge), false to handle low input as active (falling edge)
-    active_high: true
-    ### (PulseCounter); how to init the last state; "new" or not set to start with zero, "mqtt" to fetch last state from mqtt state topic
+    ### ElectricityPulseMeter: pulse counter based electricity meter, additionbally publishes energy and power
+    type: <type>
+    ### (PulseCounter, ElectricityPulseMeter); pgio pin (BCM) to use
+    gpio_pin: <pin>
+    ### (PulseCounter, ElectricityPulseMeter); true to handle high input as active (raising edge), false to handle low input as active (falling edge)
+    active_high: <true|false>
+    ### (PulseCounter, ElectricityPulseMeter); how to init the last state; "new" or not set to start with zero, "mqtt" to fetch last state from mqtt state topic
     #init_mode: new
-    ### (PulseCounter); minimum publish interval in seconds, at least one pulse must be counted to trigger publish
+    ### (PulseCounter, ElectricityPulseMeter); minimum publish interval in seconds, at least one pulse must be counted to trigger publish
     # publish_interval_seconds: 0
+    ### (ElectricityPulseMeter); number of pulses for 1 kWh
+    pulses_per_kwh: <pulse_per_kwz>
