@@ -27,10 +27,6 @@ class Device():
         self._mqtt = mqtt
         self._state_topic: str = self._mqtt.base_topic + "/" + self.id
 
-    
-    def __str__(self):
-        return f"Device(id={self._id}, name={self._name})"
-
 
     @property
     def id(self) -> str:
@@ -144,10 +140,10 @@ class Devices:
 
     def mock_input(self) -> None:
         """
-        Use for testing purpose only. Mocks/simulates a GPIO input on the first device.
+        Use for testing purpose only. Mocks/simulates a GPIO input on all devices.
         """
-        if self._devices:
-            self._devices[0].mock_input()
+        for device in self._devices:
+            device.mock_input()
 
 
     def _create_devices(self, config: ConfigParser, mqtt: MqttConnection) -> list[Device]:

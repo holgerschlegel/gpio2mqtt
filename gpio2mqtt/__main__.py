@@ -11,7 +11,7 @@ import yaml
 
 from . import GPIO2MQTT_VERSION
 from .config import ConfigParser
-from .device_pulse_counter import PulseCounter
+from .device_pulse_counter import PulseCounter, ElectricityPulseMeter
 from .devices import Device, Devices
 from .mqtt import MqttConnection
 
@@ -75,7 +75,7 @@ def _load_config_yaml(file: str) -> ConfigParser:
 def _get_device_classes() -> list[type[Device]]:
     # device classes must be passes as argument to Devices instance to break cyclic imports
     # for now, there is no need to dynamically scan for available device classes
-    return [ PulseCounter ]
+    return [ PulseCounter, ElectricityPulseMeter ]
 
 
 def _setup_signals(exit_event: threading.Event, devices: Devices):
