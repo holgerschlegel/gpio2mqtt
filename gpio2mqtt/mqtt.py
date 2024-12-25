@@ -25,10 +25,10 @@ class MqttConnection:
         mqtt_config: ConfigParser = config.get_node_parser("mqtt", _LOGGER)
         self._host = mqtt_config.get_str("host", mandatory = True)
         self._port = mqtt_config.get_int("port", mandatory = True, default = 1883, min = 1, max = 65535)
-        self._base_topic = mqtt_config.get_str("base_topic", mandatory = True, default = "gpio2mqtt")
         user: str = mqtt_config.get_str("user", mandatory = True)
         password: str = mqtt_config.get_str("password", mandatory = True)
         client_id: str = mqtt_config.get_str("client_id")
+        self._base_topic = mqtt_config.get_str("base_topic", mandatory = True, default = "gpio2mqtt")
 
         # configure mqtt client but do not connect now
         self._client: mqtt_client.Client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, client_id)
