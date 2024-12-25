@@ -81,7 +81,9 @@ The configuration file `config.yaml` is loaded from the current working director
 - `client_id`  
   Client id to use. It not provided, a default client id is generated based on the configured base topic. This default prevents running multiple instances using with the same base topic to prevent problems.
 - `base_topic` *default `gpio2mqtt`*  
-  Base topic to publish device states.
+  Base topic for device state topics.
+- `homeassistant_topic` *default `homeassistant`*  
+  Base topic for Home Assistant MQTT auto discovery.
 
 ### devices
 
@@ -95,13 +97,15 @@ A list of devices with the following keys:
 - `type` *required*  
   Device type. The following types are supported:
   - `PulseCounter`  
-    Counts high or low input pulses. Publishes a total count and delta values in intervals.  
+    Counts high or low input pulses. Publishes a total count in intervals.  
     Required keys: `gpio_pin`, `active_high`  
     Optional keys: `init_mode`, `publish_interval_seconds`
   - `ElectricityPulseMeter`  
     Pulse counter based electricity meter. Calculates power and energy from counted pulses.  
     Required keys: `gpio_pin`, `active_high`, `pulses_per_kwh`  
     Optional keys: `init_mode`, `publish_interval_seconds`
+- `homeassistant_discovery` *default true*  
+  Whenever to announce the device to Home Assistant via MQTT auto discovery message.
 - `gpio_pin` *see device types*  
   GPIO pin (BCM) to use.  
 - `active_high` *see device types*  

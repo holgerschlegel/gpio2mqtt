@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from hashlib import sha1
 import json
 import logging
 import paho.mqtt.client as mqtt_client
@@ -29,6 +30,10 @@ class MqttConnection:
         password: str = mqtt_config.get_str("password", mandatory = True)
         client_id: str = mqtt_config.get_str("client_id")
         self._base_topic = mqtt_config.get_str("base_topic", mandatory = True, default = "gpio2mqtt")
+        self._homeassistant_topic = mqtt_config.get_str("homeassistant_topic", mandatory = True, default = "homeassistant")
+
+        if not client_id:
+            client_id = "gpio2mqtt-" + sha1(self._base_topic.encode("utf8")).hexdigest()
 
         # configure mqtt client but do not connect now
         self._client: mqtt_client.Client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, client_id)
@@ -50,6 +55,24 @@ class MqttConnection:
             str: the gpio2mqqt base topic
         """
         return self._base_topic
+
+
+    @property
+    def homeassistant_topic(self) -> str:
+        """
+        Returns:
+            str: the Home Assistant MQTT discovery topic
+        """
+        return self._homeassistant_topic
+
+
+    @property
+    def bridge_state_topic(self) -> str:
+        """
+        Returns:
+            str: the bridge state topic used for device availability
+        """
+        return self._bridge_state_topic
 
 
     def start(self) -> bool:

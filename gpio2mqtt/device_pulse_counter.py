@@ -20,7 +20,7 @@ _INIT_WAIT_MAX_SECONDS: Final[int] = 10
 class PulseCounter(Device):
     """
     A simple pulse counter.
-    Publishes a total "count", the corresponding "timestamp", and delta values since last published state.
+    Publishes the total "count" and the corresponding "timestamp".
     """
 
 
@@ -38,9 +38,9 @@ class PulseCounter(Device):
         self._init_mode: str = device_config.get_str("init_mode", default = "new", allowed = { "new", _INIT_MODE_MQTT })
         self._publish_interval_seconds: int = device_config.get_int("publish_interval_seconds", mandatory = True, default = 0, min = 0)
 
-        self._diff_count: int = None
-        self._last_count: int = None
-        self._last_time: float = None
+        self._count: int = None
+        self._published_count: int = None
+        self._published_time: float = None
 
         self._initializing: bool = False
         self._lock: RLock = RLock()
@@ -53,7 +53,6 @@ class PulseCounter(Device):
             self._init_state()
             self._init_sensor()
             self._start_command_handler()
-            # TODO publish home assistant discovery config
 
 
     def stop(self) -> None:
@@ -62,7 +61,7 @@ class PulseCounter(Device):
             self._stop_init_last_state()
             self._stop_command_handler()
             self._stop_sensor()
-            if self._diff_count > 0:
+            if self._count > self._published_count:
                 # publish last state to miss as few counts as possible in case of a restart
                 self._publish_state(time.time())
             _LOGGER.info("Stopped %s with id %s", self.__class__.__name__, self.id)
@@ -72,55 +71,50 @@ class PulseCounter(Device):
         # defined in class Device
         with self._lock:
             now: float = time.time()
-            diff_seconds: float = self._get_diff_seconds(now)
+            diff_seconds: float = now - self._published_time
 
             if self._initializing and diff_seconds > _INIT_WAIT_MAX_SECONDS:
                 # waited long enough, looks like there is no last state
                 _LOGGER.debug("Waiting for last state timed out for %s with id %s", self.__class__.__name__, self.id)
                 self._stop_init_last_state()
  
-            if not self._initializing and self._check_loop_publish_state(diff_seconds):
-                self._publish_state(now, diff_seconds)
+            if not self._initializing and self._count > self._published_count and diff_seconds >= self._publish_interval_seconds:
+                self._publish_state(now)
 
 
     def get_count(self) -> int:
         """
-        Gets the current total count.
+        Gets the current count.
 
         Returns:
-            int: the total count
+            int: the count
         """
         with self._lock:
-            return self._last_count + self._diff_count
+            return self._count
 
 
     def set_count(self, count: int, now: float = None) -> None:
         """
-        Sets the current total count to the given value. Publishes the new state.
+        Sets the current count to the given value. Publishes the new state.
 
         Args:
-            count (int): the total count
-            now (float, optional): the time related to the total count, None to use now
+            count (int): the count
+            now (float, optional): the time related to the count, None to use now
         """
         with self._lock:
             if now is None:
                 now = time.time()
-            self._diff_count = 0
-            self._last_count = count
-            self._last_time = now
+            self._count = count
+            self._published_count = count
+            self._published_time = now
             self._publish_state(now, 0)
 
 
-    def _get_diff_seconds(self, now: float) -> float:
-        return round(now - self._last_time, 6)
-
-
     def _init_state(self) -> None:
-        self._diff_count = 0
-        self._last_count = 0
-        self._last_time = time.time()
+        self._count = 0
+        self._published_count = 0
+        self._published_time = time.time()
         if self._init_mode == _INIT_MODE_MQTT:
-            # try to init last state from mqtt state topic
             self._initializing = True
             self._mqtt.add_message_handler(self.state_topic, self._on_init_last_state_message)
 
@@ -140,9 +134,10 @@ class PulseCounter(Device):
                     read_count: int = int(payload.get("count"))
                     read_time: float = utils.parse_iso_timestamp_tz(payload.get("timestamp"))
                     if read_count and read_time:
-                        # message is valid, set last state but keep already counted pulses
-                        self._last_count = read_count
-                        self._last_time = read_time
+                        # message is valid, set last state but keep pulses counted since start
+                        self._count += read_count
+                        self._published_count = read_count
+                        self._published_time = read_time
                     else:
                         _LOGGER.error("Parsing last state message for %s with id %s failed: missing required values", self.__class__.__name__, self.id)
                 except (ValueError, json.JSONDecodeError) as error:
@@ -164,7 +159,7 @@ class PulseCounter(Device):
     def _on_sensor_pulse(self) -> None:
         with self._lock:
             _LOGGER.debug("Input pulse for %s with id %s detected", self.__class__.__name__, self.id)
-            self._diff_count += 1
+            self._count += 1
 
 
     def mock_input(self) -> None:
@@ -190,35 +185,38 @@ class PulseCounter(Device):
             _LOGGER.error("Parsing set count command message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
 
 
-    def _check_loop_publish_state(self, diff_seconds: float) -> bool:
-        return self._diff_count > 0 and diff_seconds >= self._publish_interval_seconds
-
-
-    def _publish_state(self, now: float, diff_seconds: float = None) -> None:
-        if diff_seconds is None:
-            diff_seconds = self._get_diff_seconds(now)
-        payload: dict = self._get_publish_state_payload(now, diff_seconds)
+    def _publish_state(self, now: float) -> None:
+        payload: dict = self._get_publish_state_payload(now)
         _LOGGER.debug("Publishing state for %s with id %s: %s", self.__class__.__name__, self.id, payload)
         if self._mqtt.publish(self.state_topic, payload, retain = True):
-            self._last_count += self._diff_count
-            self._last_time = now
-            self._diff_count = 0
+            self._published_count = self._count
+            self._published_time = now
 
 
-    def _get_publish_state_payload(self, now: float, diff_seconds: float) -> dict:
+    def _get_publish_state_payload(self, now: float) -> dict:
         payload: dict = { 
-            "count" : self.get_count(),
-            "timestamp" : utils.format_iso_timestamp_tz(now),
-            "diff_count" : self._diff_count,
-            "diff_seconds" : diff_seconds
+            "count" : self._count,
+            "timestamp" : utils.format_iso_timestamp_tz(now)
         }
         return payload
+
+
+    def get_discovery_components(self) -> dict[str, dict]:
+        # defined in class Device
+        components: dict[str, dict] = {}
+        # TODO name ("Anzahl", "Zeitpunkt") wegen mehrsprachig in config.yaml auslagern
+        # .... als <component_key + "_name"> oder <"entity_" + component_key + "_name">
+        components.update(self.get_discovery_component_config("sensor", "count", "Anzahl",
+                icon = "mdi:counter", state_class = "total_increasing", value_template = "{{ value_json.count }}"))
+        components.update(self.get_discovery_component_config("sensor", "timestamp", "Zeitpunkt",
+                enabled_by_default = False, device_class = "timestamp", value_template = "{{ value_json.timestamp }}"))
+        return components
 
 
 class ElectricityPulseMeter(PulseCounter):
     """
     An pulse counter based electricity meter.
-    Additionally publishes the total "energy" (in kWh) and the current "power" (in W) calculated with the deltas since last published.
+    In additiom to the values of the Pulse Counter, this devices publishes the "energy" (in kWh) and the current "power" (in W).
     """
 
     def __init__(self, device_config: ConfigParser, mqtt: MqttConnection) -> None:
@@ -232,8 +230,11 @@ class ElectricityPulseMeter(PulseCounter):
         super().__init__(device_config, mqtt)
         self._pulses_per_kwh: int = device_config.get_int("pulses_per_kwh", mandatory = True, min = 1, max = 10_000)
 
+        self._pulse_time: float = None
+        self._pulse_seconds: float = None
+
         # factor to calculate power in W from diff_count and diff_seconds
-        # count * _pulses_per_kwh => kWh, devide by hours (seconds  / 3600), multiply by 1000 (kW -> W)
+        # count * pulses_per_kwh => kWh, devide by hours (seconds / 3600), multiply by 1000 (kW -> W)
         self._power_calc_factor = 3_600_000 / self._pulses_per_kwh
 
 
@@ -258,6 +259,37 @@ class ElectricityPulseMeter(PulseCounter):
         self.set_count(int(energy * self._pulses_per_kwh), now)
 
 
+    def get_power(self) -> float | None:
+        """
+        Gets the current power in W. The result is calculated from the time between the last two counted pulses.
+
+        Returns:
+            float | None: the current power in W, None if not available
+        """
+        power: float = None
+        if self._pulse_seconds is not None:
+            power = round(self._power_calc_factor / self._pulse_seconds, 1)
+        return power
+
+
+    def _init_state(self) -> None:
+        self._pulse_time = None
+        self._pulse_seconds = None
+        super()._init_state()
+
+
+    def _on_sensor_pulse(self) -> None:
+        with self._lock:
+            super()._on_sensor_pulse()
+            # duration between the last two pulse is used to calculate current power
+            now: float = time.time()
+            if self._pulse_time is None:
+                self._pulse_time = now
+            else:
+                self._pulse_seconds = now - self._pulse_time
+                self._pulse_time = now
+
+
     def _start_command_handler(self):
         super()._start_command_handler()
         self._mqtt.add_message_handler(self.state_topic + "/set/energy", self._on_set_energy_message)
@@ -278,10 +310,22 @@ class ElectricityPulseMeter(PulseCounter):
             _LOGGER.error("Parsing set energy command message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
 
 
-    def _get_publish_state_payload(self, now, diff_seconds):
-        payload: dict = super()._get_publish_state_payload(now, diff_seconds)
+    def _get_publish_state_payload(self, now):
+        payload: dict = super()._get_publish_state_payload(now)
         payload["energy"] = self.get_energy()
-        if diff_seconds > 0:        
-            power: float = round((self._diff_count / diff_seconds) * self._power_calc_factor, 1)
-            payload["power"] = power
+        payload["power"] = self.get_power()
         return payload
+
+
+    def get_discovery_components(self):
+        components: dict[str, dict] = super().get_discovery_components()
+        # hide component "count" from base class PulseCounter
+        components["count"]["enabled_by_default"] = False
+
+        # TODO name ("Energie", "Leistung") wegen mehrsprachig in config.yaml auslagern (siehen PulseCounter)
+        components.update(self.get_discovery_component_config("sensor", "energy", "Energie",
+                device_class = "energy", unit_of_measurement = "kWh",
+                state_class = "total_increasing", value_template = "{{ value_json.energy }}"))
+        components.update(self.get_discovery_component_config("sensor", "power", "Leistung",
+                device_class = "power", unit_of_measurement = "W", value_template = "{{ value_json.power }}"))
+        return components
