@@ -1,3 +1,6 @@
+"""
+Utilities.
+"""
 import time
 from typing import Final
 
@@ -16,7 +19,7 @@ def format_iso_timestamp_tz(seconds: float) -> str:
         str: the iso timestamp string with time zone
     """
     result: str = None
-    if time:
+    if seconds:
         result = time.strftime(ISO_FORMAT_TIMESTAMP_TZ, time.localtime(seconds))
     return result
 

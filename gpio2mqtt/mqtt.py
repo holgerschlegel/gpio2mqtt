@@ -1,7 +1,11 @@
+"""
+MQTT broker connection.
+"""
 from collections.abc import Callable
 from hashlib import sha1
 import json
 import logging
+
 import paho.mqtt.client as mqtt_client
 
 from .config import ConfigParser
@@ -25,12 +29,13 @@ class MqttConnection:
         """
         mqtt_config: ConfigParser = config.get_node_parser("mqtt", _LOGGER)
         self._host = mqtt_config.get_str("host", mandatory = True)
-        self._port = mqtt_config.get_int("port", mandatory = True, default = 1883, min = 1, max = 65535)
+        self._port = mqtt_config.get_int("port", mandatory = True, default = 1883, min_value = 1, max_value = 65535)
         user: str = mqtt_config.get_str("user", mandatory = True)
         password: str = mqtt_config.get_str("password", mandatory = True)
         client_id: str = mqtt_config.get_str("client_id")
         self._base_topic = mqtt_config.get_str("base_topic", mandatory = True, default = "gpio2mqtt")
-        self._homeassistant_topic = mqtt_config.get_str("homeassistant_topic", mandatory = True, default = "homeassistant")
+        self._homeassistant_topic = mqtt_config.get_str("homeassistant_topic", mandatory = True,
+                default = "homeassistant")
 
         if not client_id:
             client_id = "gpio2mqtt-" + sha1(self._base_topic.encode("utf8")).hexdigest()
@@ -45,7 +50,8 @@ class MqttConnection:
 
         self._message_handlers: dict[str, set[MqttConnectionOnMessage]] = {}
         self._bridge_state_topic: str = self._base_topic + "/bridge/state"
-        self._client.will_set(self._bridge_state_topic, self._get_bridge_state_payload_str(False), qos = 0, retain = True)
+        self._client.will_set(self._bridge_state_topic, self._get_bridge_state_payload_str(False),
+                qos = 0, retain = True)
 
 
     @property
@@ -88,7 +94,8 @@ class MqttConnection:
         if result:
             self._client.loop_start()
         else:
-            _LOGGER.critical("Connection to MQTT broker %s:%d failed: error_code=%s", self.host, self._port, error_code)
+            _LOGGER.critical("Connection to MQTT broker %s:%d failed: error_code=%s",
+                    self._host, self._port, error_code)
         return result
 
 
@@ -96,11 +103,12 @@ class MqttConnection:
         """
         Stops the network loop and disconnects from the MQTT broker. Does nothing if not connected.
         """
-        if self._client.is_connected:
+        if self._client.is_connected():
             _LOGGER.info("Disconnecting from MQTT broker")
-            self.publish(self._bridge_state_topic, self._get_bridge_state_payload_str(False), as_json = False, retain = True)
+            self.publish(self._bridge_state_topic, self._get_bridge_state_payload_str(False),
+                    as_json = False, retain = True)
             self._client.loop_stop()
-            error_code: mqtt_client.MQTTErrorCode = self._client.disconnect()
+            self._client.disconnect()
 
 
     def publish(self, topic: str, payload: any, as_json: bool = True, qos: int = 0, retain: bool = False) -> bool:
@@ -110,7 +118,8 @@ class MqttConnection:
         Args:
             topic (str): the topic (absolute, including the base topic)
             payload (any): the message to send
-            as_json (bool): True to serialize the given payload as json before publish, False to publish the payload as-is
+            as_json (bool):
+                    True to serialize the given payload as json before publish, False to publish the payload as-is
             qos (int, optional): the quality of service level
             retain (bool, optional): True to send a retained message, False otherwise
         Returns:
@@ -135,7 +144,7 @@ class MqttConnection:
         if handlers is None:
             handlers = { handler }
             self._message_handlers[topic] = handlers
-            if self._client.is_connected:
+            if self._client.is_connected():
                 _LOGGER.info("Subscribing to topic %s", topic)
                 self._client.subscribe(topic)
         else:
@@ -165,19 +174,22 @@ class MqttConnection:
 
 
     def _on_connect(self, client: mqtt_client.Client, userdata, connect_flags, reason_code, properties):
+        # pylint: disable=unused-argument
         _LOGGER.debug("Connected with reason code %s", reason_code)
         self.publish(self._bridge_state_topic, self._get_bridge_state_payload_str(True), as_json = False, retain = True)
         # (re)subscribe to topics with added handlers
-        for topic in self._message_handlers.keys():
+        for topic in self._message_handlers:
             _LOGGER.info("Subscribing to topic %s", topic)
             self._client.subscribe(topic)
 
 
     def _on_disconnect(self, client: mqtt_client.Client, userdata, disconnect_flags, reason_code, properties):
+        # pylint: disable=unused-argument
         _LOGGER.debug("Disconnected with reason code %s", reason_code)
 
 
     def _on_message(self, client: mqtt_client.Client, userdata, message: mqtt_client.MQTTMessage):
+        # pylint: disable=unused-argument
         _LOGGER.debug("Received message on topic %s: %s", message.topic, str(message.payload))
         handlers = self._message_handlers.get(message.topic)
         if handlers:

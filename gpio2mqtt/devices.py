@@ -1,7 +1,11 @@
+"""
+Base to manage devices.
+"""
 from abc import abstractmethod
+import logging
+
 from gpiozero import Device as GpiozeroDevice
 from gpiozero.pins.mock import MockFactory
-import logging
 
 from . import GPIO2MQTT_VERSION
 from .config import ConfigParser
@@ -9,7 +13,7 @@ from .mqtt import MqttConnection
 
 _LOGGER = logging.getLogger(__name__)
 
- 
+
 class Device():
     """
     Base class for devices.
@@ -47,7 +51,7 @@ class Device():
             str: the unique device name
         """
         return self._name
-    
+
 
     @property
     def state_topic(self) -> str:
@@ -63,7 +67,6 @@ class Device():
         """
         Starts the device.
         """
-        pass
 
 
     @abstractmethod
@@ -71,7 +74,6 @@ class Device():
         """
         Stops the device.
         """
-        pass
 
 
     @abstractmethod
@@ -79,14 +81,12 @@ class Device():
         """
         Invoked from the main loop. Devices may use it to publish the device values to MQTT. 
         """
-        pass
 
 
     def mock_input(self) -> None:
         """
         Use for testing purpose only. Mocks/simulates an input on the device.
         """
-        pass
 
 
     def publish_discovery(self) -> None:
@@ -96,7 +96,8 @@ class Device():
         if self._homeassistant_discovery:
             topic: str = self._mqtt.homeassistant_topic + "/device/gpio2mqtt/" + self.id + "/config"
             payload: dict = self.get_discovery_payload()
-            _LOGGER.debug("Publishing Home Assistant discovery for %s with id %s: %s", self.__class__.__name__, self.id, payload)
+            _LOGGER.debug("Publishing Home Assistant discovery for %s with id %s: %s",
+                    self.__class__.__name__, self.id, payload)
             self._mqtt.publish(topic, payload, retain = True)
         else:
             _LOGGER.debug("Home Assistant discovery disabled for %s with id %s", self.__class__.__name__, self.id)
@@ -128,7 +129,7 @@ class Device():
             "components" : self.get_discovery_components()
         }
         return payload
-    
+
 
     @abstractmethod
     def get_discovery_components(self) -> dict[str, dict]:
@@ -150,7 +151,8 @@ class Device():
     ) -> dict[str, dict]:
         """
         Helper method to get the discovery config for a single component/entity of this device.
-        The given component key is used to build the object_id and unique_id values and as key for the component in the returned dict.
+        The given component key is used to build the object_id and unique_id values and as key for the component in
+        the returned dict.
         This method is meant to be used from get_discovery_components.
 
         Args:
@@ -175,13 +177,14 @@ class Devices:
     """
     Handles the devices.
     """
-    
+
     def __init__(self, device_classes: list[type[Device]], config: ConfigParser, mqtt: MqttConnection):
         """
         Creates an instance.
 
         Args:
-            device_classes (list[type[Device]]): the available device classes, passes as argument to break cyclic imports
+            device_classes (list[type[Device]]):
+                    the available device classes, passes as argument to break cyclic imports
             config (ConfigParser): the application configuration
             mqtt (MqttConnection): the mqtt connection
         """

@@ -1,3 +1,6 @@
+"""
+Helper to access configuration dictionaries.
+"""
 from logging import Logger
 import re
 from typing import Self
@@ -11,7 +14,7 @@ class ConfigParser:
     __slots__ = ("_raw", "_logger", "_base_key", "_parent_parser", "_errors")
 
 
-    def __init__(self, raw: dict[str, str], logger: Logger, base_key: str = "", parent_parser: Self = None):
+    def __init__(self, raw: dict[str, any], logger: Logger, base_key: str = "", parent_parser: Self = None):
         """
         Creates an instance for the root node of the given dictionary.
         The optional arguments (base_key and parent_parser) are for internal use only.
@@ -29,8 +32,16 @@ class ConfigParser:
         self._errors: int = 0
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"ConfigParser(base_key={self._base_key}, raw={self._raw})"
+
+
+    def raw(self) -> dict[str, any]:
+        """
+        Returns:
+            dict[str, any]: the raw dict
+        """
+        return self._raw
 
 
     @property
@@ -62,7 +73,8 @@ class ConfigParser:
                     True to return a parser for empty or not existing sub nodes
                     False to return None for empty or not existing sub nodes
         Returns:
-            Self: the parser for the sub node, None if return_empty is False and dictionary contains no values for the sub node
+            Self: the parser for the sub configuration node,
+                    None if return_empty is False and dictionary contains no values for the sub node
         """
         node_raw = self._raw.get(key)
         if node_raw is None and return_empty:
@@ -115,7 +127,8 @@ class ConfigParser:
             mandatory (bool, optional): True if the value is mandatory, False otherwise
             default (str, optional): the default value
             allowed (set[str], optional): the allowed values, None for all values are allowed
-            regex_pattern (str | re.Pattern[str], optional): the regualar expression pattern the value must match, None for no pattern check
+            regex_pattern (str | re.Pattern[str], optional):
+                    the regualar expression pattern the value must match, None for no pattern check
             regex_flags (int, optional): the regular expression flags, only used if regex_pattern is not None
         Returns:
             str: the string value or None
@@ -129,8 +142,9 @@ class ConfigParser:
             if allowed is not None and value not in allowed:
                 self.error("Invalid value: %s%s: '%s' is not in %s", self._base_key, key, value, allowed)
                 value = None
-            if regex_pattern is not None and re.fullmatch(regex_pattern, value, regex_flags) == None:
-                self.error("Invalid value: %s%s: '%s' does not match regex pattern '%s'", self._base_key, key, value, regex_pattern)
+            if regex_pattern is not None and re.fullmatch(regex_pattern, value, regex_flags) is None:
+                self.error("Invalid value: %s%s: '%s' does not match regex pattern '%s'",
+                        self._base_key, key, value, regex_pattern)
                 value = None
         return value
 
@@ -138,7 +152,8 @@ class ConfigParser:
     def get_bool(self, key: str, mandatory: bool = False, default: bool = None) -> bool:
         """
         Gets the bool value for the given key.
-        Returns None if the value can not be interpreted as a bool or is not valid according to the given validation arguments.
+        Returns None if the value can not be interpreted as a bool or is not valid according to the given validation
+        arguments.
 
         Args:
             key (str): the key for the value
@@ -164,16 +179,20 @@ class ConfigParser:
         return value
 
 
-    def get_int(self, key: str, mandatory: bool = False, default: int = None, min: int = None, max: int = None) -> int:
+    def get_int(
+            self, key: str, mandatory: bool = False, default: int = None,
+            min_value: int = None, max_value: int = None
+    ) -> int:
         """
         Gets the int value for the given key.
-        Returns None if the value can not be interpreted as a int or is not valid according to the given validation arguments.
+        Returns None if the value can not be interpreted as a int or is not valid according to the given validation
+        arguments.
 
         Args:
             key (str): the key for the value
             mandatory (bool, optional): True if the value is mandatory, False otherwise
             default (int, optional): the default value
-            min (int, optional): the minimum allowed value, None for no minimum
+            min_value (int, optional): the minimum allowed value, None for no minimum
             max (int, optional): the maximum allowed value, None for no maximum
         Returns:
             int: the int value or None
@@ -191,10 +210,10 @@ class ConfigParser:
             except ValueError:
                 self.error("Invalid value: %s%s: '%s' is not an int", self._base_key, key, string)
             if value is not None:
-                if min is not None and value < min:
-                    self._critical("Invalid value: %s%s: %d is less than %d", self._base_key, key, value, min)
-                if max is not None and value > max:
-                    self._critical("Invalid value: %s%s: %d is greater than %d", self._base_key, key, value, max)
+                if min_value is not None and value < min_value:
+                    self.error("Invalid value: %s%s: %d is less than %d", self._base_key, key, value, min_value)
+                if max_value is not None and value > max_value:
+                    self.error("Invalid value: %s%s: %d is greater than %d", self._base_key, key, value, max_value)
         return value
 
 

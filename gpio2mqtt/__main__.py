@@ -1,4 +1,6 @@
-# Main entry point of the GPIO2MQTT application
+"""
+Main entry point of the GPIO2MQTT application.
+"""
 import argparse
 import logging
 import logging.config
@@ -68,7 +70,7 @@ def _load_config_yaml(file: str) -> ConfigParser:
     except FileNotFoundError:
         _LOGGER.critical("Configuration file '%s' not found", file)
     except yaml.YAMLError as error:
-        _LOGGER.critical("Configuration file '%s' invalid: ", file, error)
+        _LOGGER.critical("Configuration file '%s' invalid: %s", file, error)
     return result
 
 
@@ -79,15 +81,16 @@ def _get_device_classes() -> list[type[Device]]:
 
 
 def _setup_signals(exit_event: threading.Event, devices: Devices):
-    def exit_handler(signum, frame):
+    def exit_handler(signum, frame): # pylint: disable=unused-argument
         _LOGGER.info("Received signal '%s'. Shuting down GPIO2MQTT ...", signal.strsignal(signum))
         exit_event.set()
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
 
     if devices.using_mock_gpio:
-        _LOGGER.info("Installing signal handler to MOCK gpio input. Command to trigger: kill -s sigusr1 %s", os.getpid())
-        def usr1_handler(signum, frame):
+        _LOGGER.info("Installing signal handler to MOCK gpio input. Command to trigger: kill -s sigusr1 %s",
+                os.getpid())
+        def usr1_handler(signum, frame): # pylint: disable=unused-argument
             _LOGGER.info("Received signal '%s'", signal.strsignal(signum))
             devices.mock_input()
         signal.signal(signal.SIGUSR1, usr1_handler)
@@ -98,13 +101,21 @@ def _loop(exit_event: threading.Event, devices: Devices) -> None:
         try:
             devices.loop()
             time.sleep(1)
-        except Exception as error:
+        except Exception as error: # pylint: disable=broad-exception-caught
             # try to recover from an unexpected exception by sleeping some time ...
             _LOGGER.error("Something went wrong, sleeping 60 seconds: %s", error)
             time.sleep(60)
 
 
-def main(config: ConfigParser) -> int: 
+def main(config: ConfigParser) -> int:
+    """
+    Main entry point of the application.
+
+    Args:
+        config (ConfigParser): the configuration
+    Returns:
+        int: the exit code
+    """
     _LOGGER.info("Starting GPIO2MQTT service version %s ...", GPIO2MQTT_VERSION)
 
     # create and start objects
