@@ -1,10 +1,14 @@
+"""
+Implementations of pulse counter devices.
+"""
 import json
-from gpiozero import LineSensor
 import logging
-import paho.mqtt.client as mqtt_client
 from threading import RLock
 import time
 from typing import Final
+
+from gpiozero import LineSensor
+import paho.mqtt.client as mqtt_client
 
 from .config import ConfigParser
 from .devices import Device
@@ -33,15 +37,19 @@ class PulseCounter(Device):
             mqtt (MqttConnection): the mqtt connection
         """
         super().__init__(device_config, mqtt)
-        self._gpio_pin: int = device_config.get_int("gpio_pin", mandatory = True, min = 1, max = 40)
+        self._gpio_pin: int = device_config.get_int("gpio_pin", mandatory = True, min_value = 1, max_value = 40)
         self._active_high: bool = device_config.get_bool("active_high", mandatory = True)
         self._init_mode: str = device_config.get_str("init_mode", default = "new", allowed = { "new", _INIT_MODE_MQTT })
-        self._publish_interval_seconds: int = device_config.get_int("publish_interval_seconds", mandatory = True, default = 0, min = 0)
+        self._publish_interval_seconds: int = device_config.get_int("publish_interval_seconds",
+                mandatory = True, default = 0, min_value = 0)
+        self._count_name: str = device_config.get_str("count_name", default = "Count")
+        self._timestamp_name: str = device_config.get_str("timestamp_name", default = "Timestamp")
 
         self._count: int = None
         self._published_count: int = None
         self._published_time: float = None
 
+        self._sensor = None
         self._initializing: bool = False
         self._lock: RLock = RLock()
 
@@ -77,8 +85,9 @@ class PulseCounter(Device):
                 # waited long enough, looks like there is no last state
                 _LOGGER.debug("Waiting for last state timed out for %s with id %s", self.__class__.__name__, self.id)
                 self._stop_init_last_state()
- 
-            if not self._initializing and self._count > self._published_count and diff_seconds >= self._publish_interval_seconds:
+
+            if not self._initializing and self._count > self._published_count \
+                    and diff_seconds >= self._publish_interval_seconds:
                 self._publish_state(now)
 
 
@@ -107,7 +116,7 @@ class PulseCounter(Device):
             self._count = count
             self._published_count = count
             self._published_time = now
-            self._publish_state(now, 0)
+            self._publish_state(now)
 
 
     def _init_state(self) -> None:
@@ -128,7 +137,8 @@ class PulseCounter(Device):
     def _on_init_last_state_message(self, message: mqtt_client.MQTTMessage) -> None:
         with self._lock:
             if self._initializing:
-                _LOGGER.info("Received last state message for %s with id %s: %s", self.__class__.__name__, self.id, message.payload)
+                _LOGGER.info("Received last state message for %s with id %s: %s",
+                        self.__class__.__name__, self.id, message.payload)
                 try:
                     payload: dict = json.loads(message.payload)
                     read_count: int = int(payload.get("count"))
@@ -139,9 +149,11 @@ class PulseCounter(Device):
                         self._published_count = read_count
                         self._published_time = read_time
                     else:
-                        _LOGGER.error("Parsing last state message for %s with id %s failed: missing required values", self.__class__.__name__, self.id)
+                        _LOGGER.error("Parsing last state message for %s with id %s failed: missing required values",
+                                self.__class__.__name__, self.id)
                 except (ValueError, json.JSONDecodeError) as error:
-                    _LOGGER.error("Parsing last state message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
+                    _LOGGER.error("Parsing last state message for %s with id %s failed: %s",
+                            self.__class__.__name__, self.id, error)
                 self._stop_init_last_state()
 
 
@@ -176,13 +188,15 @@ class PulseCounter(Device):
 
 
     def _on_set_count_message(self, message: mqtt_client.MQTTMessage) -> None:
-        _LOGGER.info("Received set count command message for %s with id %s: %s", self.__class__.__name__, self.id, message.payload)
+        _LOGGER.info("Received set count command message for %s with id %s: %s",
+                self.__class__.__name__, self.id, message.payload)
         try:
             read_count: int = int(message.payload.decode())
             if read_count:
                 self.set_count(read_count)
         except (ValueError) as error:
-            _LOGGER.error("Parsing set count command message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
+            _LOGGER.error("Parsing set count command message for %s with id %s failed: %s",
+                    self.__class__.__name__, self.id, error)
 
 
     def _publish_state(self, now: float) -> None:
@@ -194,7 +208,7 @@ class PulseCounter(Device):
 
 
     def _get_publish_state_payload(self, now: float) -> dict:
-        payload: dict = { 
+        payload: dict = {
             "count" : self._count,
             "timestamp" : utils.format_iso_timestamp_tz(now)
         }
@@ -204,11 +218,9 @@ class PulseCounter(Device):
     def get_discovery_components(self) -> dict[str, dict]:
         # defined in class Device
         components: dict[str, dict] = {}
-        # TODO name ("Anzahl", "Zeitpunkt") wegen mehrsprachig in config.yaml auslagern
-        # .... als <component_key + "_name"> oder <"entity_" + component_key + "_name">
-        components.update(self.get_discovery_component_config("sensor", "count", "Anzahl",
+        components.update(self.get_discovery_component_config("sensor", "count", self._count_name,
                 icon = "mdi:counter", state_class = "total_increasing", value_template = "{{ value_json.count }}"))
-        components.update(self.get_discovery_component_config("sensor", "timestamp", "Zeitpunkt",
+        components.update(self.get_discovery_component_config("sensor", "timestamp", self._timestamp_name,
                 enabled_by_default = False, device_class = "timestamp", value_template = "{{ value_json.timestamp }}"))
         return components
 
@@ -216,7 +228,8 @@ class PulseCounter(Device):
 class ElectricityPulseMeter(PulseCounter):
     """
     An pulse counter based electricity meter.
-    In additiom to the values of the Pulse Counter, this devices publishes the "energy" (in kWh) and the current "power" (in W).
+    In additiom to the values of the Pulse Counter, this devices publishes the "energy" (in kWh) and the current
+    "power" (in W).
     """
 
     def __init__(self, device_config: ConfigParser, mqtt: MqttConnection) -> None:
@@ -228,7 +241,10 @@ class ElectricityPulseMeter(PulseCounter):
             mqtt (MqttConnection): the mqtt connection
         """
         super().__init__(device_config, mqtt)
-        self._pulses_per_kwh: int = device_config.get_int("pulses_per_kwh", mandatory = True, min = 1, max = 10_000)
+        self._pulses_per_kwh: int = device_config.get_int("pulses_per_kwh", mandatory = True,
+                min_value = 1, max_value = 10_000)
+        self._energy_name: str = device_config.get_str("energy_name", default = "Energy")
+        self._power_name: str = device_config.get_str("power_name", default = "Power")
 
         self._pulse_time: float = None
         self._pulse_seconds: float = None
@@ -250,7 +266,8 @@ class ElectricityPulseMeter(PulseCounter):
 
     def set_energy(self, energy: float, now: float = None) -> None:
         """
-        Sets the current total energy in kWh to the given value. Calculates and sets the corresponding total pulse count. Publishes the new state.
+        Sets the current total energy in kWh to the given value. Calculates and sets the corresponding total pulse
+        count. Publishes the new state.
 
         Args:
             energy (float): the energy in kWh
@@ -293,7 +310,7 @@ class ElectricityPulseMeter(PulseCounter):
     def _start_command_handler(self):
         super()._start_command_handler()
         self._mqtt.add_message_handler(self.state_topic + "/set/energy", self._on_set_energy_message)
-    
+
 
     def _stop_command_handler(self):
         super()._stop_command_handler()
@@ -301,13 +318,15 @@ class ElectricityPulseMeter(PulseCounter):
 
 
     def _on_set_energy_message(self, message: mqtt_client.MQTTMessage) -> None:
-        _LOGGER.info("Received set energy command message for %s with id %s: %s", self.__class__.__name__, self.id, message.payload)
+        _LOGGER.info("Received set energy command message for %s with id %s: %s",
+                self.__class__.__name__, self.id, message.payload)
         try:
             read_energy: int = int(message.payload.decode())
             if read_energy:
                 self.set_energy(read_energy)
         except (ValueError) as error:
-            _LOGGER.error("Parsing set energy command message for %s with id %s failed: %s", self.__class__.__name__, self.id, error)
+            _LOGGER.error("Parsing set energy command message for %s with id %s failed: %s",
+                    self.__class__.__name__, self.id, error)
 
 
     def _get_publish_state_payload(self, now):
@@ -322,10 +341,9 @@ class ElectricityPulseMeter(PulseCounter):
         # hide component "count" from base class PulseCounter
         components["count"]["enabled_by_default"] = False
 
-        # TODO name ("Energie", "Leistung") wegen mehrsprachig in config.yaml auslagern (siehen PulseCounter)
-        components.update(self.get_discovery_component_config("sensor", "energy", "Energie",
+        components.update(self.get_discovery_component_config("sensor", "energy", self._energy_name,
                 device_class = "energy", unit_of_measurement = "kWh",
                 state_class = "total_increasing", value_template = "{{ value_json.energy }}"))
-        components.update(self.get_discovery_component_config("sensor", "power", "Leistung",
+        components.update(self.get_discovery_component_config("sensor", "power", self._power_name,
                 device_class = "power", unit_of_measurement = "W", value_template = "{{ value_json.power }}"))
         return components
