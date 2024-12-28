@@ -21,9 +21,6 @@ My first project in Python ...
 
 ## Todos
 - systemd service file and notification integration
-- clean up config structure for devices
-  - I don't like the way it currently is ...
-  - maybe move every "Home Assistant" property to a sub node
 
 
 ## Bookmarks for References and Docs
@@ -95,20 +92,18 @@ A list of devices with the following keys:
 - `id` *required*  
   Unique id of the device. Also used to in MQTT topic names for the device.  
   An id must contain only ascii letters (upper, lower), digits, hyphen and underscore.  
-- `name` *required*  
-  Unique friendly name for the Home Assistant device.
 - `type` *required*  
   Device type. The following types are supported:
   - `PulseCounter`  
     Counts high or low input pulses. Publishes a total count in intervals.  
     Required keys: `gpio_pin`, `active_high`  
-    Optional keys: `init_mode`, `publish_interval_seconds`, `count_name`, `timestamp_name`
+    Optional keys: `init_mode`, `publish_interval_seconds`  
+    HA Components: `count`, `timestamp`
   - `ElectricityPulseMeter`  
     Pulse counter based electricity meter. Calculates power and energy from counted pulses.  
     Required keys: `gpio_pin`, `active_high`, `pulses_per_kwh`  
-    Optional keys: `init_mode`, `publish_interval_seconds`, `count_name`, `timestamp_name`, `energy_name`, `power_name`
-- `homeassistant_discovery` *default true*  
-  Whenever to announce the device to Home Assistant via MQTT auto discovery message.
+    Optional keys: `init_mode`, `publish_interval_seconds`  
+    HA Components: `count`, `timestamp`, `energy`, `power`
 - `gpio_pin` *see device types*  
   GPIO pin (BCM) to use.  
 - `active_high` *see device types*  
@@ -121,12 +116,22 @@ A list of devices with the following keys:
   `mqtt` to fetch last state from mqtt state topic.
 - `publish_interval_seconds` *see device types*  
   Minimum interval in seconds to publish the device state. Independent of this setting, the state is only published if input has been recevied since the last publish.
+- `pulses_per_kwh` *see device types*  
+  Number if input pulses per 1 kWh.
+
+### device.homeassistant
+
+Information for the Home Assistant MQTT auto discovery.
+For each device component (see above), a corresponding `<component>_name` can be set.
+
+- `enabled` *default true*  
+  Whenever to announce the device to Home Assistant via MQTT auto discovery message.
+- `name` *required if enabled is true*  
+  Friendly name for the Home Assistant device.
 - `count_name` *default `Count`*  
   Friendly name for the Home Assistant count sensor.
 - `timestamp_name` *default `Timestamp`*  
   Friendly name for the Home Assistant timestamp sensor.
-- `pulses_per_kwh` *see device types*  
-  Number if input pulses per 1 kWh.
 - `energy_name` *default `Energy`*  
   Friendly name for the Home Assistant energy sensor.
 - `power_name` *default `Power`*  

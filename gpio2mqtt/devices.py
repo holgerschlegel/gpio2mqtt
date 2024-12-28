@@ -14,6 +14,27 @@ from .mqtt import MqttConnection
 _LOGGER = logging.getLogger(__name__)
 
 
+class HomeAssistantInfo:
+    """
+    Holds device settings specific for the Home Assistant MQTT auto discovery.
+    """
+
+    def __init__(self, ha_config: ConfigParser, component_defaults: dict[str, str]):
+        """
+        Creates an instance from the given device home assistant configuration and the given component defaults.
+
+        Args:
+            ha_config (ConfigParser): the device home assistant configuration
+            component_defaults (dict[str, str]): the component defaults
+        """
+        self.enabled: bool = ha_config.get_bool("enabled", default = True)
+        self.name: str = ha_config.get_str("name", mandatory = self.enabled)
+        if component_defaults:
+            for key, default_name in component_defaults.items():
+                name_key: str = key + "_name"
+                self.__setattr__(name_key, ha_config.get_str(name_key, default = default_name))
+
+
 class Device():
     """
     Base class for devices.
@@ -21,15 +42,15 @@ class Device():
 
     def __init__(self, device_config: ConfigParser, mqtt: MqttConnection):
         """
-        Creates an instance from the given device configuration node.
+        Creates an instance from the given device configuration.
 
         Args:
             device_config (ConfigParser): the device configuration
             mqtt (MqttConnection): the mqtt connection
         """
         self._id: str = device_config.get_str("id", mandatory = True, regex_pattern = "[a-zA-Z0-9_-]+")
-        self._name: str = device_config.get_str("name", mandatory = True)
-        self._homeassistant_discovery: bool = device_config.get_bool("homeassistant_discovery", default = True)
+        self._ha_info: HomeAssistantInfo = HomeAssistantInfo(
+                device_config.get_node_parser("homeassistant"), self.get_discovery_component_defaults())
 
         self._mqtt = mqtt
         self._state_topic: str = self._mqtt.base_topic + "/" + self.id
@@ -42,15 +63,6 @@ class Device():
             str: the unique device id
         """
         return self._id
-
-
-    @property
-    def name(self) -> str:
-        """
-        Returns:
-            str: the unique device name
-        """
-        return self._name
 
 
     @property
@@ -93,7 +105,7 @@ class Device():
         """
         Publishes the Home Assistant MQTT auto discovery message for this device.
         """
-        if self._homeassistant_discovery:
+        if self._ha_info and self._ha_info.enabled:
             topic: str = self._mqtt.homeassistant_topic + "/device/gpio2mqtt/" + self.id + "/config"
             payload: dict = self.get_discovery_payload()
             _LOGGER.debug("Publishing Home Assistant discovery for %s with id %s: %s",
@@ -113,7 +125,7 @@ class Device():
         payload: dict = {
             "device" : {
                 "identifiers" : self.id,
-                "name" : self.name,
+                "name" : self._ha_info.name,
                 "manufacturer" : "GPIO2MQTT"
             },
             "origin" : {
@@ -131,6 +143,17 @@ class Device():
         return payload
 
 
+    def get_discovery_component_defaults(self) -> dict[str, str]:
+        """
+        Gets the defaults for the components for Home Assistant MQTT auto discovery.
+        The returned dict musst contain one entry for each component/entity with the component friendly name as value.
+
+        Returns:
+            dict[str, str]: the component defaults
+        """
+        return dict()
+
+
     @abstractmethod
     def get_discovery_components(self) -> dict[str, dict]:
         """
@@ -146,19 +169,18 @@ class Device():
     def get_discovery_component_config(self,
             platform: str,
             component_key: str,
-            component_name: str,
             **kwargs
     ) -> dict[str, dict]:
         """
         Helper method to get the discovery config for a single component/entity of this device.
         The given component key is used to build the object_id and unique_id values and as key for the component in
-        the returned dict.
+        the returned dict. The component name is set to the value from the device config node "homeassistant" using
+        the component key plus the suffix "_name".
         This method is meant to be used from get_discovery_components.
 
         Args:
             platform (str): the entity platform
             component_key (str): the component key
-            component_name (str): the friendly component name
         Returns:
             dict[str, dict]: _description_
         """
@@ -167,7 +189,7 @@ class Device():
             "platform" : platform,
             "object_id" : object_id,
             "unique_id" : object_id,
-            "name" : component_name,
+            "name" : str(getattr(self._ha_info, component_key + "_name", component_key)),
         }
         config.update(kwargs)
         return { component_key : config }
@@ -238,15 +260,13 @@ class Devices:
         device_configs: list[ConfigParser] = config.get_list_parsers("devices", _LOGGER)
         known_types: set[str] = set(self._device_classes.keys())
         ids: set[str] = set()
-        names: set[str] = set()
         devices: list[Device] = []
         for device_config in device_configs:
-            type: str = device_config.get_str("type", mandatory = True, allowed = known_types)
-            if type is not None:
-                device_class = self._device_classes.get(type)
+            device_type: str = device_config.get_str("type", mandatory = True, allowed = known_types)
+            if device_type is not None:
+                device_class = self._device_classes.get(device_type)
                 device = device_class(device_config, mqtt)
                 device_config.check_unique("id", device.id, ids)
-                device_config.check_unique("name", device.name, names)
                 if not device_config.has_errors:
                     devices.append(device)
                     _LOGGER.debug("Created %s with id %s", device.__class__.__name__, device.id)

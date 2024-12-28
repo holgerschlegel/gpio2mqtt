@@ -11,15 +11,16 @@ mqtt:
 ### list of devices
 devices:
   - id: <unique id>
-    name: <friendly device name>
     type: <PulseCounter|ElectricityPulseMeter>
-    # homeassistant_discovery: true
     gpio_pin: <pin>
     active_high: <true|false>
     # init_mode: <new|mqtt>
     # publish_interval_seconds: 0
-    # count_name: Count
-    # timestamp_name: Timestamp
     # pulses_per_kwh: <pulse_per_kwz>
-    # energy_name: Energy
-    # power_name: Power
+    homeassistant:
+      # enabled: true
+      name: <friendly device name>
+      # count_name: Count
+      # timestamp_name: Timestamp
+      # energy_name: Energy
+      # power_name: Power
