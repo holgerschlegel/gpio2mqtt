@@ -16,23 +16,59 @@ _LOGGER = logging.getLogger(__name__)
 
 class HomeAssistantInfo:
     """
-    Holds device settings specific for the Home Assistant MQTT auto discovery.
+    Holds informations for the Home Assistant MQTT auto discovery.
     """
 
-    def __init__(self, ha_config: ConfigParser, component_defaults: dict[str, str]):
+    __slots__ = ("_enabled", "_name", "_component_names")
+
+
+    def __init__(self, ha_config: ConfigParser):
         """
-        Creates an instance from the given device home assistant configuration and the given component defaults.
+        Creates an instance from the given home assistant configuration.
 
         Args:
-            ha_config (ConfigParser): the device home assistant configuration
-            component_defaults (dict[str, str]): the component defaults
+            ha_config (ConfigParser): the home assistant configuration
         """
-        self.enabled: bool = ha_config.get_bool("enabled", default = True)
-        self.name: str = ha_config.get_str("name", mandatory = self.enabled)
-        if component_defaults:
-            for key, default_name in component_defaults.items():
-                name_key: str = key + "_name"
-                self.__setattr__(name_key, ha_config.get_str(name_key, default = default_name))
+        self._enabled: bool = ha_config.get_bool("enabled", default = True)
+        self._name: str = ha_config.get_str("name", mandatory = self._enabled)
+        self._component_names: dict[str, str] = {}
+        for key in ha_config.raw:
+            if key.endswith("_name"):
+                self._component_names[key[:-5]] = ha_config.get_str(key)
+        print(self._component_names)
+
+
+    @property
+    def enabled(self) -> bool:
+        """
+        Returns:
+            str: True if the device is published to Home Assistant, False otherwise
+        """
+        return self._enabled
+
+
+    @property
+    def name(self) -> str:
+        """
+        Returns:
+            str: the device name
+        """
+        return self._name
+
+
+    def get_component_name(self, component_key: str, default: str) -> str:
+        """
+        Gets the friendly name for the component with the given key. Returns the given default if no name is set in
+        the configuration.
+
+        Args:
+            component_key (str): the component key
+            default (str): the default component name
+        Returns:
+            str: the component name
+        """
+        result: str = self._component_names.get(component_key, None)
+        return result if result is not None else default
 
 
 class Device():
@@ -49,8 +85,7 @@ class Device():
             mqtt (MqttConnection): the mqtt connection
         """
         self._id: str = device_config.get_str("id", mandatory = True, regex_pattern = "[a-zA-Z0-9_-]+")
-        self._ha_info: HomeAssistantInfo = HomeAssistantInfo(
-                device_config.get_node_parser("homeassistant"), self.get_discovery_component_defaults())
+        self._homeassistant: HomeAssistantInfo = HomeAssistantInfo(device_config.get_node_parser("homeassistant"))
 
         self._mqtt = mqtt
         self._state_topic: str = self._mqtt.base_topic + "/" + self.id
@@ -105,14 +140,17 @@ class Device():
         """
         Publishes the Home Assistant MQTT auto discovery message for this device.
         """
-        if self._ha_info and self._ha_info.enabled:
+        if self._homeassistant:
             topic: str = self._mqtt.homeassistant_topic + "/device/gpio2mqtt/" + self.id + "/config"
-            payload: dict = self.get_discovery_payload()
-            _LOGGER.debug("Publishing Home Assistant discovery for %s with id %s: %s",
-                    self.__class__.__name__, self.id, payload)
-            self._mqtt.publish(topic, payload, retain = True)
-        else:
-            _LOGGER.debug("Home Assistant discovery disabled for %s with id %s", self.__class__.__name__, self.id)
+            if self._homeassistant.enabled:
+                payload: dict = self.get_discovery_payload()
+                _LOGGER.info("Publishing Home Assistant discovery for %s with id %s: %s",
+                        self.__class__.__name__, self.id, payload)
+                self._mqtt.publish(topic, payload, retain = True)
+            else:
+                _LOGGER.info("Removing Home Assistant discovery for %s with id %s",
+                        self.__class__.__name__, self.id)
+                self._mqtt.publish(topic, None, as_json = False, retain = True)
 
 
     def get_discovery_payload(self) -> dict:
@@ -125,7 +163,7 @@ class Device():
         payload: dict = {
             "device" : {
                 "identifiers" : self.id,
-                "name" : self._ha_info.name,
+                "name" : self._homeassistant.name,
                 "manufacturer" : "GPIO2MQTT"
             },
             "origin" : {
@@ -143,17 +181,6 @@ class Device():
         return payload
 
 
-    def get_discovery_component_defaults(self) -> dict[str, str]:
-        """
-        Gets the defaults for the components for Home Assistant MQTT auto discovery.
-        The returned dict musst contain one entry for each component/entity with the component friendly name as value.
-
-        Returns:
-            dict[str, str]: the component defaults
-        """
-        return dict()
-
-
     @abstractmethod
     def get_discovery_components(self) -> dict[str, dict]:
         """
@@ -169,18 +196,19 @@ class Device():
     def get_discovery_component_config(self,
             platform: str,
             component_key: str,
+            default_name: str,
             **kwargs
     ) -> dict[str, dict]:
         """
         Helper method to get the discovery config for a single component/entity of this device.
         The given component key is used to build the object_id and unique_id values and as key for the component in
-        the returned dict. The component name is set to the value from the device config node "homeassistant" using
-        the component key plus the suffix "_name".
+        the returned dict.
         This method is meant to be used from get_discovery_components.
 
         Args:
             platform (str): the entity platform
             component_key (str): the component key
+            default_name (str): the default component name
         Returns:
             dict[str, dict]: _description_
         """
@@ -189,7 +217,7 @@ class Device():
             "platform" : platform,
             "object_id" : object_id,
             "unique_id" : object_id,
-            "name" : str(getattr(self._ha_info, component_key + "_name", component_key)),
+            "name" : self._homeassistant.get_component_name(component_key, default_name),
         }
         config.update(kwargs)
         return { component_key : config }
@@ -269,5 +297,5 @@ class Devices:
                 device_config.check_unique("id", device.id, ids)
                 if not device_config.has_errors:
                     devices.append(device)
-                    _LOGGER.debug("Created %s with id %s", device.__class__.__name__, device.id)
+                    _LOGGER.info("Created %s with id %s", device.__class__.__name__, device.id)
         return devices

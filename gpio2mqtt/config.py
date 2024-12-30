@@ -36,6 +36,7 @@ class ConfigParser:
         return f"ConfigParser(base_key={self._base_key}, raw={self._raw})"
 
 
+    @property
     def raw(self) -> dict[str, any]:
         """
         Returns:
@@ -254,4 +255,4 @@ class ConfigParser:
     def _inc_errors(self) -> None:
         self._errors += 1
         if self._parent_parser:
-            self._parent_parser._inc_errors()
+            self._parent_parser._inc_errors() # pylint: disable=protected-access

@@ -19,6 +19,17 @@
             }
         },
         {
+            "name": "Debug: --validate",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gpio2mqtt",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--logconsole",
+                "--validate"
+            ]
+        },
+        {
             "name": "Debug: --version",
             "type": "debugpy",
             "request": "launch",

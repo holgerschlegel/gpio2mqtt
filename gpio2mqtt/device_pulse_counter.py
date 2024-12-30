@@ -42,8 +42,6 @@ class PulseCounter(Device):
         self._init_mode: str = device_config.get_str("init_mode", default = "new", allowed = { "new", _INIT_MODE_MQTT })
         self._publish_interval_seconds: int = device_config.get_int("publish_interval_seconds",
                 mandatory = True, default = 0, min_value = 0)
-        self._count_name: str = device_config.get_str("count_name", default = "Count")
-        self._timestamp_name: str = device_config.get_str("timestamp_name", default = "Timestamp")
 
         self._count: int = None
         self._published_count: int = None
@@ -211,18 +209,13 @@ class PulseCounter(Device):
         return payload
 
 
-    def get_discovery_component_defaults(self) -> dict[str, str]:
-        return {
-            "count" : "Count",
-            "timestamp" : "Timestamp"
-        }
-
-
     def get_discovery_components(self) -> dict[str, dict]:
         components: dict[str, dict] = {}
-        components.update(self.get_discovery_component_config("sensor", "count",
+        components.update(self.get_discovery_component_config(
+                "sensor", "count", "Count",
                 icon = "mdi:counter", state_class = "total_increasing", value_template = "{{ value_json.count }}"))
-        components.update(self.get_discovery_component_config("sensor", "timestamp",
+        components.update(self.get_discovery_component_config(
+                "sensor", "timestamp", "Timestamp",
                 enabled_by_default = False, device_class = "timestamp", value_template = "{{ value_json.timestamp }}"))
         return components
 
@@ -336,23 +329,16 @@ class ElectricityPulseMeter(PulseCounter):
         return payload
 
 
-    def get_discovery_component_defaults(self) -> dict[str, str]:
-        defaults: dict[str, str] = super().get_discovery_component_defaults()
-        defaults.update({
-            "energy" : "Energy",
-            "power" : "Power"
-        })
-        return defaults
-
-
     def get_discovery_components(self):
         components: dict[str, dict] = super().get_discovery_components()
-        # hide component "count" created by base class PulseCounter
+
+        # hide component "count" created by base class
         components["count"]["enabled_by_default"] = False
 
-        components.update(self.get_discovery_component_config("sensor", "energy",
-                device_class = "energy", unit_of_measurement = "kWh",
+        components.update(self.get_discovery_component_config(
+                "sensor", "energy", "Energy", device_class = "energy", unit_of_measurement = "kWh",
                 state_class = "total_increasing", value_template = "{{ value_json.energy }}"))
-        components.update(self.get_discovery_component_config("sensor", "power",
-                device_class = "power", unit_of_measurement = "W", value_template = "{{ value_json.power }}"))
+        components.update(self.get_discovery_component_config(
+                "sensor", "power", "Power", device_class = "power", unit_of_measurement = "W",
+                value_template = "{{ value_json.power }}"))
         return components

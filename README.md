@@ -61,7 +61,7 @@ Create python virtual environment
 
 Create configuration file
 - create file `config.yaml`
-- validate configuration with `.venv/bin/python -m gpio2mqtt --validate`
+- validate configuration with `.venv/bin/python -m gpio2mqtt --logconsole --validate`
 
 
 ## Configuration File

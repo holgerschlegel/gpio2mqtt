@@ -107,7 +107,7 @@ def _loop(exit_event: threading.Event, devices: Devices) -> None:
             time.sleep(60)
 
 
-def main(config: ConfigParser) -> int:
+def main(config_file: str, validate_config: bool) -> int:
     """
     Main entry point of the application.
 
@@ -116,7 +116,11 @@ def main(config: ConfigParser) -> int:
     Returns:
         int: the exit code
     """
-    _LOGGER.info("Starting GPIO2MQTT service version %s ...", GPIO2MQTT_VERSION)
+    _LOGGER.info("Starting GPIO2MQTT version %s ...", GPIO2MQTT_VERSION)
+
+    config: ConfigParser = _load_config_yaml(config_file)
+    if not config:
+        return 2
 
     # create and start objects
     exit_event = threading.Event()
@@ -124,6 +128,9 @@ def main(config: ConfigParser) -> int:
     devices = Devices(_get_device_classes(), config, mqtt)
     if config.has_errors:
         return 2
+    if validate_config:
+        _LOGGER.info("Configuration file '%s' is valid", config_file)
+        return 0
 
     if not mqtt.start():
         return 3
@@ -143,16 +150,8 @@ def main(config: ConfigParser) -> int:
 
 
 # main entry point
-args = _parse_args()
+args: argparse.Namespace = _parse_args()
 _setup_logging(args.logconsole, args.logdebug)
 
-config_file: str = os.path.abspath("config.yaml")
-config: ConfigParser = _load_config_yaml(config_file)
-if not config:
-    sys.exit(2)
-if args.validate:
-    _LOGGER.info("Configuration file '%s' is valid", config_file)
-    sys.exit(0)
-
-exit_code: int = main(config)
+exit_code: int = main(os.path.abspath("config.yaml"), args.validate)
 sys.exit(exit_code)
