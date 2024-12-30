@@ -1,0 +1,13 @@
+[Unit]
+Description=GPIO2MQTT Service
+
+[Service]
+Type=exec
+User=<user name>
+WorkingDirectory=<gpio2mqtt directory>
+ExecStart=<gpio2mqtt directory>/.venv/bin/python3 -m gpio2mqtt
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

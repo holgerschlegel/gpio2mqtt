@@ -25,11 +25,11 @@ My first project in Python ...
 
 ## Bookmarks for References and Docs
 
-- https://github.com/yaleman/mqttgpio
 - https://github.com/flyte/mqtt-io
 - https://github.com/eclipse-paho/paho.mqtt.python/blob/master/README.rst#network-loop
 - https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
 - https://gpiozero.readthedocs.io/en/stable/index.html
+- https://github.com/torfsen/python-systemd-tutorial
 
 
 ## Hardware Setup
@@ -67,6 +67,7 @@ Create configuration file
 ## Configuration File
 
 The configuration file `config.yaml` is loaded from the current working directory.
+An example configuration files is provided as `config.example.yaml`.
 
 ### mqtt
 
@@ -149,3 +150,17 @@ Available command line arguments:
 - `--validate` validate config.yaml and exit
 - `--version` show program version and exit
 - `--help` show command line help and exit
+
+
+## Run via Systemd
+
+Create serviced service unit file by copying `gpio2mqtt.example.service` as `gpio2mqtt.service` and edit it to fill in
+the placeholders (working directory and user) it contains.
+
+Create a soft link in `/etc/systemd/system` to the created service unit file.
+- `sudo ln -s <gpio2mqtt directory>/gpio2mqtt.service /etc/systemd/system/gpio2mqtt.service`
+
+Reload the systemd daemon, enable and start the service:
+- `systemctl daemon-reload`
+- `systemctl enable gpio2mqtt.service`
+- `systemctl start gpio2mqtt.service`
