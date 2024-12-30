@@ -161,6 +161,6 @@ Create a soft link in `/etc/systemd/system` to the created service unit file.
 - `sudo ln -s <gpio2mqtt directory>/gpio2mqtt.service /etc/systemd/system/gpio2mqtt.service`
 
 Reload the systemd daemon, enable and start the service:
-- `systemctl daemon-reload`
-- `systemctl enable gpio2mqtt.service`
-- `systemctl start gpio2mqtt.service`
+- `sudo systemctl daemon-reload`
+- `sudo systemctl enable gpio2mqtt.service`
+- `sudo systemctl start gpio2mqtt.service`
