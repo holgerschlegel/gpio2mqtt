@@ -141,7 +141,7 @@ class Device():
         Publishes the Home Assistant MQTT auto discovery message for this device.
         """
         if self._homeassistant:
-            topic: str = self._mqtt.homeassistant_topic + "/device/gpio2mqtt/" + self.id + "/config"
+            topic: str = self._mqtt.homeassistant_topic + "/device/" + self._mqtt.base_topic + "/" + self.id + "/config"
             if self._homeassistant.enabled:
                 payload: dict = self.get_discovery_payload()
                 _LOGGER.info("Publishing Home Assistant discovery for %s with id %s: %s",

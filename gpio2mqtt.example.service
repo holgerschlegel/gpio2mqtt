@@ -2,7 +2,7 @@
 Description=GPIO2MQTT Service
 
 [Service]
-Type=exec
+Type=notify
 User=<user name>
 WorkingDirectory=<gpio2mqtt directory>
 ExecStart=<gpio2mqtt directory>/.venv/bin/python3 -m gpio2mqtt

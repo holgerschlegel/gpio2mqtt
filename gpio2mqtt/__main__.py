@@ -11,6 +11,8 @@ import threading
 import time
 import yaml
 
+import sdnotify
+
 from . import GPIO2MQTT_VERSION
 from .config import ConfigParser
 from .device_pulse_counter import PulseCounter, ElectricityPulseMeter
@@ -137,11 +139,14 @@ def main(config_file: str, validate_config: bool) -> int:
     devices.start()
     _setup_signals(exit_event, devices)
     _LOGGER.info("GPIO2MQTT started")
+    systemd_notifier: sdnotify.SystemdNotifier = sdnotify.SystemdNotifier()
+    systemd_notifier.notify("READY=1")
 
     # main loop
     _loop(exit_event, devices)
 
     # stop objects and clean up
+    systemd_notifier.notify("STOPPING=1")
     _LOGGER.info("Stopping GPIO2MQTT ...")
     devices.stop()
     mqtt.stop()

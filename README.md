@@ -4,8 +4,6 @@ A simple project to count Raspberry Pi GPIO input pulses and publish the total c
 
 My first project in Python ...
 
-**This project is at a very early stage and definitely not feature complete ...**
-
 
 ## Features
 
@@ -17,10 +15,12 @@ My first project in Python ...
 - PulseCounter: a basic pulse counter
 - ElectricityPulseMeter: a pulse counter based energy meter (Ferraris counter) with enery (kWh) and power (W) output
 - Announce devices to Home Assistant MQTT auto discovery
+- Systemd service file example and sd_notify integration
 
 
 ## Todos
-- systemd service file and notification integration
+
+Nothing left that I have thought of so far ...
 
 
 ## Bookmarks for References and Docs
@@ -80,9 +80,11 @@ An example configuration files is provided as `config.example.yaml`.
 - `password` *required*  
   Password to use.
 - `client_id`  
-  Client id to use. It not provided, a default client id is generated based on the configured base topic. This default prevents running multiple instances using with the same base topic to prevent problems.
+  Client id to use. It not provided, a default client id is generated based on the configured base topic.  
+  This default prevents running multiple instances using with the same base topic to prevent problems.
 - `base_topic` *default `gpio2mqtt`*  
-  Base topic for device state topics.
+  Base topic for device state topics. Also used as <node_id> for Home Assistant MQTT auto discovery topics.  
+  Can be used to fully separate multiple installations (like dev and prod).
 - `homeassistant_topic` *default `homeassistant`*  
   Base topic for Home Assistant MQTT auto discovery.
 
